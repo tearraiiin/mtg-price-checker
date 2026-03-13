@@ -20,15 +20,24 @@
     <button id="searchBtn">Search</button>
     <div style="margin-top: 10px;">
       <div class="toggle-group">
-        <input type="checkbox" id="toggleCollapse"> <label for="toggleCollapse">Collapse by Card Version</label>
+        <input type="checkbox" id="toggleCheapestVendor"> <label for="toggleCheapestVendor">Show Cheapest Vendor Only</label>
       </div>
       <div class="toggle-group">
-        <input type="checkbox" id="toggleLowest"> <label for="toggleLowest">Lowest Price Only</label>
+        <input type="checkbox" id="toggleCheapestVersion"> <label for="toggleCheapestVersion">Show Cheapest Version Only</label>
+      </div>
+      <div class="toggle-group">
+        <input type="checkbox" id="toggleInStock" checked> <label for="toggleInStock">Show In Stock Only</label>
       </div>
     </div>
   </div>
 
   <div id="results"></div>
+  
+  <div id="debug" style="display: none; margin-top: 20px; padding-top: 10px; border-top: 2px dashed #ccc; font-size: 0.7em; color: #888;">
+    <strong>Raw Titles (Debug):</strong>
+    <div id="rawTitles"></div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
