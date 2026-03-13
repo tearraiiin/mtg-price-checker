@@ -1,0 +1,13 @@
+{
+    "manifest_version": 3,
+    "name": "TCG Price Checker",
+    "version": "1.0",
+    "permissions": ["storage"],
+    "host_permissions": [
+      "https://store.401games.ca/*",
+      "https://facetofacegames.com/*"
+    ],
+    "action": {
+      "default_popup": "popup.html"
+    }
+  }
