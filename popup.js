@@ -6,6 +6,23 @@ const STORES = [
 let setMap = {};
 let currentRequestId = 0;
 
+/**
+ * Normalizes a string by:
+ * 1. Converting to lowercase
+ * 2. Treating hyphens as spaces (important for MTG names like All-seeing)
+ * 3. Stripping all non-letter/non-number characters (except spaces)
+ * 4. Collapsing multiple spaces into one
+ * 5. Trimming
+ */
+function normalizeName(str) {
+  if (!str) return "";
+  return str.toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Load set names mapping
 async function loadSetMap() {
   if (Object.keys(setMap).length > 0) return;
@@ -20,11 +37,10 @@ async function loadSetMap() {
 // Reusable search function
 async function performSearch(queryInput) {
   const input = document.getElementById('cardName');
-  // Use provided query or read from input
-  let query = (queryInput !== undefined ? queryInput : input.value).trim();
+  const rawQuery = (queryInput !== undefined ? queryInput : input.value).trim();
   
-  // Strip commas from the query
-  query = query.replace(/,/g, '');
+  // Clean the query: strip all non-letters/numbers (including ' ? - ,) but keep spaces
+  const query = normalizeName(rawQuery);
 
   const resultsDiv = document.getElementById('results');
   const rawTitlesDiv = document.getElementById('rawTitles');
@@ -35,9 +51,9 @@ async function performSearch(queryInput) {
     return;
   }
 
-  // Update input UI if we were passed a query from elsewhere
+  // Update input UI
   if (queryInput !== undefined) {
-    input.value = query;
+    input.value = rawQuery;
   }
 
   const requestId = ++currentRequestId;
@@ -45,7 +61,7 @@ async function performSearch(queryInput) {
   const showCheapestVersion = document.getElementById('toggleCheapestVersion').checked;
   const showInStockOnly = document.getElementById('toggleInStock').checked;
 
-  resultsDiv.innerHTML = `<div style="color: #666;">Searching for "<strong>${query}</strong>"...</div>`;
+  resultsDiv.innerHTML = `<div style="color: #666;">Searching for "<strong>${rawQuery}</strong>"...</div>`;
   rawTitlesDiv.innerHTML = '';
 
   if (Object.keys(setMap).length === 0) await loadSetMap();
@@ -53,13 +69,14 @@ async function performSearch(queryInput) {
 
   const searchTasks = [];
   STORES.forEach(store => {
+    // Broaden API search to avoid strict punctuation/formatting failures.
+    // We rely on the local filter below to ensure accuracy.
     if (store.name === "401 Games") {
-      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" "${query} ("` });
-      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" "${query} -"` });
+      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${query}` });
     } else if (store.name === "Face to Face") {
-      searchTasks.push({ store, q: `vendor:Magic "${query} ["` });
+      searchTasks.push({ store, q: `vendor:Magic ${query}` });
     } else {
-      searchTasks.push({ store, q: `"${query}"` });
+      searchTasks.push({ store, q: `${query}` });
     }
   });
 
@@ -78,7 +95,8 @@ async function performSearch(queryInput) {
           let setCode = "???";
 
           if (store.name === "401 Games") {
-            const nameMatch = p.title.match(/^([^(-]+)/);
+            // Match name: everything until " (" or " -" or end of string
+            const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
             if (nameMatch) baseName = nameMatch[1].trim();
             const matches = p.title.match(/\(([^)]+)\)/g);
             if (matches) {
@@ -119,15 +137,10 @@ async function performSearch(queryInput) {
       seenUrls.add(item.url);
       if (showInStockOnly && !item.available) return false;
 
-      const titleLower = item.fullTitle.toLowerCase().replace(/,/g, '');
-      const queryLower = query.toLowerCase();
+      const baseClean = normalizeName(item.baseName);
+      const queryClean = normalizeName(query);
 
-      if (item.vendor === "401 Games") {
-        return titleLower.startsWith(`${queryLower} (` ) || titleLower.startsWith(`${queryLower} -`);
-      } else if (item.vendor === "Face to Face") {
-        return titleLower.startsWith(`${queryLower} [`);
-      }
-      return item.baseName.toLowerCase().replace(/,/g, '') === queryLower;
+      return baseClean === queryClean;
     });
     
     allResults.sort((a, b) => a.price - b.price);
