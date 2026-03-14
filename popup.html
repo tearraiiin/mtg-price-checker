@@ -2,38 +2,143 @@
 <html>
 <head>
   <style>
-    body { width: 350px; padding: 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .controls { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
-    .toggle-group { margin-bottom: 8px; font-size: 0.9em; }
-    .card-item { margin-bottom: 10px; padding: 8px; border: 1px solid #eee; border-radius: 4px; }
-    .vendor-tag { font-size: 0.75em; background: #f0f0f0; padding: 2px 5px; border-radius: 3px; color: #555; }
-    .price { font-weight: bold; color: #2c3e50; }
-    input { width: 70%; padding: 5px; }
-    button#searchBtn { width: 25%; padding: 5px; cursor: pointer; }
+    body { 
+      width: 350px; 
+      padding: 15px; 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background-color: #454545; 
+      color: #f0f0f0;
+    }
+    h3 { margin-top: 0; color: #ff9900; }
+    .controls { 
+      margin-bottom: 15px; 
+      padding-bottom: 10px; 
+      border-bottom: 1px solid #666; 
+    }
+    .toggle-group { 
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px; 
+      font-size: 0.9em; 
+    }
+    .card-item { 
+      margin-bottom: 10px; 
+      padding: 10px; 
+      border: 1px solid #555; 
+      border-radius: 6px; 
+      background-color: #383838;
+    }
+    .vendor-tag { 
+      font-size: 0.75em; 
+      background: #555; 
+      padding: 2px 6px; 
+      border-radius: 3px; 
+      color: #ddd; 
+    }
+    .price { font-weight: bold; color: #ff9900; }
+    input#cardName { 
+      width: 70%; 
+      padding: 6px; 
+      background-color: #333; 
+      border: 1px solid #555; 
+      color: #fff;
+      border-radius: 4px;
+    }
+    button#searchBtn { 
+      width: 25%; 
+      padding: 6px; 
+      cursor: pointer; 
+      background-color: #ff9900; 
+      border: none; 
+      color: #333; 
+      font-weight: bold;
+      border-radius: 4px;
+    }
+    button#searchBtn:hover { background-color: #e68a00; }
+
+    /* Switch CSS */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #818181;
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #ff9900;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    a { color: #ff9900; text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <h3>TCG Price Tracker</h3>
   
   <div class="controls">
-    <input type="text" id="cardName" placeholder="Search card...">
-    <button id="searchBtn">Search</button>
-    <div style="margin-top: 10px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+      <input type="text" id="cardName" placeholder="Search card...">
+      <button id="searchBtn">Search</button>
+    </div>
+    
+    <div>
       <div class="toggle-group">
-        <input type="checkbox" id="toggleCheapestVendor"> <label for="toggleCheapestVendor">Show Cheapest Vendor Only</label>
+        <label for="toggleCheapestVendor">Show Cheapest Vendor Only</label>
+        <label class="switch">
+          <input type="checkbox" id="toggleCheapestVendor">
+          <span class="slider"></span>
+        </label>
       </div>
       <div class="toggle-group">
-        <input type="checkbox" id="toggleCheapestVersion"> <label for="toggleCheapestVersion">Show Cheapest Version Only</label>
+        <label for="toggleCheapestVersion">Show Cheapest Version Only</label>
+        <label class="switch">
+          <input type="checkbox" id="toggleCheapestVersion">
+          <span class="slider"></span>
+        </label>
       </div>
       <div class="toggle-group">
-        <input type="checkbox" id="toggleInStock" checked> <label for="toggleInStock">Show In Stock Only</label>
+        <label for="toggleInStock">Show In Stock Only</label>
+        <label class="switch">
+          <input type="checkbox" id="toggleInStock" checked>
+          <span class="slider"></span>
+        </label>
       </div>
     </div>
   </div>
 
   <div id="results"></div>
   
-  <div id="debug" style="display: none; margin-top: 20px; padding-top: 10px; border-top: 2px dashed #ccc; font-size: 0.7em; color: #888;">
+  <div id="debug" style="display: none; margin-top: 20px; padding-top: 10px; border-top: 1px dashed #666; font-size: 0.7em; color: #888;">
     <strong>Raw Titles (Debug):</strong>
     <div id="rawTitles"></div>
   </div>
