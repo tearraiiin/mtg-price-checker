@@ -3,6 +3,14 @@ const STORES = [
   { name: "Face to Face", url: "https://facetofacegames.com" }
 ];
 
+const TABLE_COLUMNS = [
+  { header: "Vendor", key: "vendor", render: (item) => `<div class="vendor-cell">${item.vendor}</div>` },
+  { header: "Set", key: "setCode", render: (item) => `<div class="set-cell">${item.setCode}</div>` },
+  { header: "Availability", key: "available", render: (item) => item.available ? '<span class="status-in">In Stock</span>' : '<span class="status-out">Out of Stock</span>' },
+  { header: "Price", key: "price", render: (item) => `<span class="price-cell">$${item.price.toFixed(2)}</span>` },
+  { header: "", key: "url", render: (item) => `<a href="${item.url}" target="_blank" class="buy-btn">Buy</a>` }
+];
+
 let setMap = {};
 let currentRequestId = 0;
 
@@ -168,16 +176,22 @@ async function performSearch(queryInput) {
       : 'No products returned from Shopify.';
 
     if (allResults.length > 0) {
-      resultsDiv.innerHTML = allResults.map(item => `
-        <div class="card-item">
-          <div style="font-weight: 600;">${item.standardizedTitle}</div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-            <span class="vendor-tag">${item.vendor}</span>
-            <span class="price">$${item.price.toFixed(2)}</span>
-          </div>
-          <div style="font-size: 0.7em; margin-top: 3px;"><a href="${item.url}" target="_blank">View Store</a></div>
-        </div>
-      `).join('');
+      const tableHeaders = TABLE_COLUMNS.map(col => `<th>${col.header}</th>`).join('');
+      const tableRows = allResults.map(item => {
+        const cells = TABLE_COLUMNS.map(col => `<td>${col.render(item)}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      resultsDiv.innerHTML = `
+        <table>
+          <thead>
+            <tr>${tableHeaders}</tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      `;
     } else {
       resultsDiv.innerHTML = `<div style="padding: 10px; color: #888;">No matches for "<strong>${query}</strong>".</div>`;
     }

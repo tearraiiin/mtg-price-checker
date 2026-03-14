@@ -2,60 +2,116 @@
 <html>
 <head>
   <style>
+    :root {
+      --font-color: #000000;
+      --border-color: #b3b3b3;
+      --accent-color: #ff9900;
+      --accent-hover: #e68a00;
+      --bg-color: #ffffff;
+    }
+
     body { 
-      width: 350px; 
+      min-width: 350px; 
+      margin: 0;
       padding: 15px; 
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-      background-color: #454545; 
-      color: #f0f0f0;
+      background-color: var(--bg-color); 
+      color: var(--font-color);
     }
-    h3 { margin-top: 0; color: #ff9900; }
+    h3 { margin-top: 1rem; margin-bottom: 15px; color: var(--font-color); }
+    
     .controls { 
-      margin-bottom: 15px; 
-      padding-bottom: 10px; 
-      border-bottom: 1px solid #666; 
+      margin-bottom: 0; 
+      padding-bottom: 8px; 
+      border-bottom: 1px solid var(--border-color); 
     }
+    
     .toggle-group { 
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px; 
+      margin: 0 6px 10px;
       font-size: 0.9em; 
     }
-    .card-item { 
-      margin-bottom: 10px; 
-      padding: 10px; 
-      border: 1px solid #555; 
-      border-radius: 6px; 
-      background-color: #383838;
+
+    .search-box {
+      display: flex;
+      border: 1px solid var(--border-color);
+      border-radius: 2px;
+      margin-bottom: 15px;
+      overflow: hidden;
     }
-    .vendor-tag { 
-      font-size: 0.75em; 
-      background: #555; 
-      padding: 2px 6px; 
-      border-radius: 3px; 
-      color: #ddd; 
+    .search-box:focus-within {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 3px rgba(255, 153, 0, 0.5);
     }
-    .price { font-weight: bold; color: #ff9900; }
     input#cardName { 
-      width: 70%; 
-      padding: 6px; 
-      background-color: #333; 
-      border: 1px solid #555; 
-      color: #fff;
-      border-radius: 4px;
+      flex: 1;
+      padding: 8px; 
+      background-color: var(--bg-color); 
+      border: none; 
+      color: var(--font-color);
+      outline: none;
     }
     button#searchBtn { 
-      width: 25%; 
-      padding: 6px; 
+      padding: 6px 12px; 
+      margin: 4px;
       cursor: pointer; 
-      background-color: #ff9900; 
+      background-color: var(--accent-color); 
       border: none; 
-      color: #333; 
+      border-radius: 2px;
+      color: #ffffff; 
       font-weight: bold;
-      border-radius: 4px;
+      transition: background-color 0.2s;
     }
-    button#searchBtn:hover { background-color: #e68a00; }
+    button#searchBtn:hover { background-color: var(--accent-hover); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+    th {
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 4px;
+      color: var(--font-color);
+    }
+    td {
+      padding: 10px 4px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+    
+    th:last-child, td:last-child {
+      text-align: right;
+    }
+    
+    .price-cell { font-weight: bold; color: var(--font-color); }
+    .vendor-cell { color: var(--font-color); }
+    .set-cell { color: var(--font-color); }
+    .status-in { color: #16a34a; font-weight: 500; }
+    .status-out { color: #dc2626; font-weight: 500; }
+
+    .buy-btn {
+      background-color: var(--accent-color);
+      color: #ffffff;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-weight: bold;
+      text-decoration: none;
+      font-size: 1em;
+      display: inline-block;
+      transition: background-color 0.2s;
+    }
+    .buy-btn:hover {
+      background-color: var(--accent-hover);
+      text-decoration: none;
+    }
+
+    a { color: var(--accent-color); text-decoration: none; }
+    a:hover { text-decoration: underline; }
 
     /* Switch CSS */
     .switch {
@@ -76,7 +132,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #818181;
+      background-color: #cccccc;
       transition: .3s;
       border-radius: 20px;
     }
@@ -92,22 +148,19 @@
       border-radius: 50%;
     }
     input:checked + .slider {
-      background-color: #ff9900;
+      background-color: var(--accent-color);
     }
     input:checked + .slider:before {
       transform: translateX(20px);
     }
-
-    a { color: #ff9900; text-decoration: none; }
-    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <h3>TCG Price Tracker</h3>
   
   <div class="controls">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-      <input type="text" id="cardName" placeholder="Search card...">
+    <div class="search-box">
+      <input type="text" id="cardName" placeholder="Smothering Tithe">
       <button id="searchBtn">Search</button>
     </div>
     
@@ -120,7 +173,7 @@
         </label>
       </div>
       <div class="toggle-group">
-        <label for="toggleCheapestVersion">Show Cheapest Version Only</label>
+        <label for="toggleCheapestVersion">Show Cheapest Print Only</label>
         <label class="switch">
           <input type="checkbox" id="toggleCheapestVersion">
           <span class="slider"></span>
