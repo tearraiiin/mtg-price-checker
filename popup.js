@@ -70,7 +70,7 @@ async function performSearch(queryInput) {
         const cacheBuster = `&_cb=${Date.now()}`;
         const res = await fetch(`${store.url}/search/suggest.json?q=${encodeURIComponent(q)}&resources[type]=product${cacheBuster}`);
         const data = await res.json();
-        const products = data.resources.results.products || [];
+        const products = data.resources?.results?.products || [];
         products.forEach(p => allRawTitles.push(`${store.name}: ${p.title} (${p.available ? 'In' : 'Out'})`));
 
         return products.map(p => {
@@ -114,22 +114,22 @@ async function performSearch(queryInput) {
     if (requestId !== currentRequestId) return;
 
     const seenUrls = new Set();
-    const queryLower = query.toLowerCase();
-allResults = allResults.filter(item => {
-  if (seenUrls.has(item.url)) return false;
-  seenUrls.add(item.url);
-  if (showInStockOnly && !item.available) return false;
+    allResults = allResults.filter(item => {
+      if (seenUrls.has(item.url)) return false;
+      seenUrls.add(item.url);
+      if (showInStockOnly && !item.available) return false;
 
-  const titleLower = item.fullTitle.toLowerCase().replace(/,/g, '');
-  const queryLower = query.toLowerCase();
+      const titleLower = item.fullTitle.toLowerCase().replace(/,/g, '');
+      const queryLower = query.toLowerCase();
 
-  if (item.vendor === "401 Games") {
-    return titleLower.startsWith(`${queryLower} (` ) || titleLower.startsWith(`${queryLower} -`);
-  } else if (item.vendor === "Face to Face") {
-    return titleLower.startsWith(`${queryLower} [`);
-  }
-  return item.baseName.toLowerCase().replace(/,/g, '') === queryLower;
-});
+      if (item.vendor === "401 Games") {
+        return titleLower.startsWith(`${queryLower} (` ) || titleLower.startsWith(`${queryLower} -`);
+      } else if (item.vendor === "Face to Face") {
+        return titleLower.startsWith(`${queryLower} [`);
+      }
+      return item.baseName.toLowerCase().replace(/,/g, '') === queryLower;
+    });
+    
     allResults.sort((a, b) => a.price - b.price);
 
     if (showCheapestVendor && showCheapestVersion) {
@@ -181,13 +181,11 @@ async function init() {
   if (searchQuery) {
     const query = decodeURIComponent(searchQuery);
     // Clear the URL IMMEDIATELY before starting the search
-    // This prevents the browser from thinking it needs to restore state
     try {
       const newUrl = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     } catch (e) {}
     
-    // Set search bar value and perform search
     performSearch(query);
   }
 }
@@ -207,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(id).addEventListener('change', () => performSearch());
   });
 
-  // Load map and check for initial search
   loadSetMap();
   init();
 });
