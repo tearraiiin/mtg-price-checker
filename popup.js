@@ -200,3 +200,13 @@ const STORES = [
   document.getElementById('toggleCheapestVendor').addEventListener('change', performSearch);
   document.getElementById('toggleCheapestVersion').addEventListener('change', performSearch);
   document.getElementById('toggleInStock').addEventListener('change', performSearch);
+
+  // Check for search parameter on load
+  window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchQuery = urlParams.get('search');
+    if (searchQuery) {
+      document.getElementById('cardName').value = searchQuery;
+      performSearch();
+    }
+  });

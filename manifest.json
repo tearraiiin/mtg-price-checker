@@ -1,13 +1,41 @@
 {
-    "manifest_version": 3,
-    "name": "TCG Price Checker",
-    "version": "1.0",
-    "permissions": ["storage"],
-    "host_permissions": [
-      "https://store.401games.ca/*",
-      "https://facetofacegames.com/*"
-    ],
-    "action": {
-      "default_popup": "popup.html"
+  "manifest_version": 3,
+  "name": "TCG Price Checker",
+  "version": "1.0",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://store.401games.ca/*",
+    "https://facetofacegames.com/*",
+    "*://*.moxfield.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.moxfield.com/*"
+      ],
+      "js": [
+        "content.js"
+      ]
     }
-  }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "setnames.json",
+        "popup.html"
+      ],
+      "matches": [
+        "*://*.moxfield.com/*"
+      ]
+    }
+  ]
+}
