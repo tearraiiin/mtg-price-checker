@@ -114,12 +114,10 @@ async function performSearch(queryInput) {
             // Match name: everything until " (" or " -" or end of string
             const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
             if (nameMatch) baseName = nameMatch[1].trim();
-            const matches = p.title.match(/\(([^)]+)\)/g);
-            if (matches) {
-              const lastMatch = matches[matches.length - 1];
-              const rawSet = lastMatch.substring(1, lastMatch.length - 1);
-              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-            }
+            
+            // Use vendor field for set name as it's more reliable for 401
+            const rawSet = p.vendor;
+            setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
           } else if (store.name === "Face to Face") {
             const nameMatch = p.title.match(/^([^[]+)/);
             if (nameMatch) baseName = nameMatch[1].trim();
