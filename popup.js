@@ -168,10 +168,13 @@ async function performSearch(queryInput) {
       seenUrls.add(item.url);
       if (showInStockOnly && !item.available) return false;
 
-      const baseClean = normalizeName(item.baseName);
       const queryClean = normalizeName(query);
-
-      return baseClean === queryClean;
+      
+      // Split the baseName by common delimiters for multi-name cards
+      // (// for split/flip, / for shorthand, - for reskins)
+      const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
+      
+      return segments.some(seg => normalizeName(seg) === queryClean);
     });
     
     allResults.sort((a, b) => a.price - b.price);
