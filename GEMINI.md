@@ -3,7 +3,7 @@
 A Chrome Extension for Magic: The Gathering (MTG) players to quickly check card prices at major Canadian retailers (401 Games, Face to Face Games).
 
 ## Core Mandates
-- **Retailers:** Currently supports 401 Games (`store.401games.ca`) and Face to Face Games (`facetofacegames.com`).
+- **Retailers:** Currently supports 401 Games (`store.401games.ca`), Face to Face Games (`facetofacegames.com`), and Emmett's Toy Stop (`emmettstoystop.com`).
 - **Data Source:** Uses Shopify's Suggestion API (`/search/suggest.json`) to fetch product results.
 - **Integration:** Targets `moxfield.com` for contextual price checking.
 
@@ -42,3 +42,13 @@ The extension is built using Manifest V3 and consists of several key files:
 ## Conventions
 - **Vanilla JavaScript:** No external libraries are used; stick to native DOM APIs and `fetch`.
 - **CSS:** Styling is embedded in HTML or injected via JS for simplicity in the extension environment.
+
+## Adding a New Retailer
+To add a new Shopify-based retailer, follow these steps in `popup.js`:
+
+1.  **Register the Store:** Add the new retailer to the `STORES` array at the top of the file.
+2.  **Configure Search:** In `performSearch()`, add a site-specific query filter (e.g., `product_type:"MTG Singles"`) to the `searchTasks` loop to improve results.
+3.  **Implement Parsing:** Add a parsing block inside the fetch loop to extract `baseName` and `setCode` from the Shopify product `title`. Each retailer often has a unique title format (e.g., using `[]`, `()`, or `-`).
+4.  **Update Set Mappings:** If the retailer uses unique set names, add them to `setnames.json` to ensure set codes are normalized across all stores.
+
+**Compatibility Check:** A site is compatible if appending `/search/suggest.json?q=Black+Lotus&resources[type]=product` to its base URL returns a JSON object with product results.

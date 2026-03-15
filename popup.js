@@ -1,6 +1,7 @@
 const STORES = [
   { name: "401 Games", url: "https://store.401games.ca" },
-  { name: "Face to Face", url: "https://facetofacegames.com" }
+  { name: "Face to Face", url: "https://facetofacegames.com" },
+  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" }
 ];
 
 const TABLE_COLUMNS = [
@@ -36,7 +37,12 @@ async function loadSetMap() {
   if (Object.keys(setMap).length > 0) return;
   try {
     const response = await fetch('setnames.json');
-    setMap = await response.json();
+    const rawMap = await response.json();
+    // Store both original and normalized keys for maximum compatibility
+    setMap = { ...rawMap };
+    for (const [name, code] of Object.entries(rawMap)) {
+      setMap[name.toLowerCase()] = code;
+    }
   } catch (e) {
     console.error("Failed to load setnames.json", e);
   }
@@ -83,6 +89,8 @@ async function performSearch(queryInput) {
       searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${query}` });
     } else if (store.name === "Face to Face") {
       searchTasks.push({ store, q: `vendor:Magic ${query}` });
+    } else if (store.name === "Emmett's Toy Stop") {
+      searchTasks.push({ store, q: `product_type:"MTG Single" ${query}` });
     } else {
       searchTasks.push({ store, q: `${query}` });
     }
@@ -110,7 +118,7 @@ async function performSearch(queryInput) {
             if (matches) {
               const lastMatch = matches[matches.length - 1];
               const rawSet = lastMatch.substring(1, lastMatch.length - 1);
-              setCode = setMap[rawSet] || rawSet;
+              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
             }
           } else if (store.name === "Face to Face") {
             const nameMatch = p.title.match(/^([^[]+)/);
@@ -118,7 +126,24 @@ async function performSearch(queryInput) {
             const matches = p.title.match(/\[([^\]]+)\]/g);
             if (matches && matches.length >= 2) {
               const rawSet = matches[matches.length - 2].substring(1, matches[matches.length - 2].length - 1);
-              setCode = setMap[rawSet] || rawSet;
+              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
+            }
+          } else if (store.name === "Emmett's Toy Stop") {
+            // Format: STEAM VENTS (RTR-247) - [RETURN TO RAVNICA]
+            const nameMatch = p.title.match(/^(.+?)(?:\s+\()/);
+            if (nameMatch) baseName = nameMatch[1].trim();
+            
+            // Try to get set name from brackets first
+            const bracketMatch = p.title.match(/\[([^\]]+)\]/);
+            if (bracketMatch) {
+              const rawSet = bracketMatch[1];
+              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
+            } else {
+              // Fallback to parentheses code
+              const parenMatch = p.title.match(/\(([^)]+)\)/);
+              if (parenMatch) {
+                setCode = parenMatch[1].split('-')[0];
+              }
             }
           }
 
