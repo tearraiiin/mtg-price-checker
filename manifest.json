@@ -9,6 +9,7 @@
   "host_permissions": [
     "https://store.401games.ca/*",
     "https://facetofacegames.com/*",
+    "https://emmettstoystop.com/*",
     "*://*.moxfield.com/*"
   ],
   "background": {
