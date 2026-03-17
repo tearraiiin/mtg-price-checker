@@ -14,8 +14,12 @@ const TABLE_COLUMNS = [
 
 let setMap = {};
 let currentRequestId = 0;
+let lastResults = [];
+let lastQuery = "";
+
 const REMOTE_SET_MAP_URL = "https://mtgwishboard.vercel.app/setnames.json";
 const LOCAL_SET_MAP_URL = "http://localhost:5173/setnames.json";
+const DASHBOARD_URL = "https://mtgwishboard.vercel.app";
 
 /**
  * Normalizes a string by:
@@ -89,29 +93,31 @@ async function loadSetMap() {
 }
 
 // Reusable search function
-async function performSearch(queryInput) {
+async function performSearch(queryInput, forceRefresh = false) {
   const input = document.getElementById('cardName');
   const rawQuery = (queryInput !== undefined ? queryInput : input.value).trim();
-  
-  // Clean the query: strip all non-letters/numbers (including ' ? - ,) but keep spaces
   const query = normalizeName(rawQuery);
-
   const resultsDiv = document.getElementById('results');
 
   if (!query) {
     resultsDiv.innerHTML = '';
+    lastResults = [];
+    lastQuery = "";
     return;
   }
 
-  // Update input UI
-  if (queryInput !== undefined) {
-    input.value = rawQuery;
-  }
+  if (queryInput !== undefined) input.value = rawQuery;
 
   const requestId = ++currentRequestId;
   const showCheapestVendor = document.getElementById('toggleCheapestVendor').checked;
   const showCheapestVersion = document.getElementById('toggleCheapestVersion').checked;
   const showInStockOnly = document.getElementById('toggleInStock').checked;
+
+  // Use cache if query is the same and we aren't forcing a refresh
+  if (!forceRefresh && query === lastQuery && lastResults.length > 0) {
+    displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId);
+    return;
+  }
 
   resultsDiv.innerHTML = `<div style="color: #666;">Searching for "<strong>${rawQuery}</strong>"...</div>`;
 
@@ -120,8 +126,6 @@ async function performSearch(queryInput) {
 
   const searchTasks = [];
   STORES.forEach(store => {
-    // Broaden API search to avoid strict punctuation/formatting failures.
-    // We rely on the local filter below to ensure accuracy.
     if (store.name === "401 Games") {
       searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${query}` });
     } else if (store.name === "Face to Face") {
@@ -146,11 +150,8 @@ async function performSearch(queryInput) {
           let setCode = "???";
 
           if (store.name === "401 Games") {
-            // Match name: everything until " (" or " -" or end of string
             const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
             if (nameMatch) baseName = nameMatch[1].trim();
-            
-            // Use vendor field for set name as it's more reliable for 401
             const rawSet = p.vendor;
             setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
           } else if (store.name === "Face to Face") {
@@ -162,21 +163,15 @@ async function performSearch(queryInput) {
               setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
             }
           } else if (store.name === "Emmett's Toy Stop") {
-            // Format: STEAM VENTS (RTR-247) - [RETURN TO RAVNICA]
             const nameMatch = p.title.match(/^(.+?)(?:\s+\()/);
             if (nameMatch) baseName = nameMatch[1].trim();
-            
-            // Try to get set name from brackets first
             const bracketMatch = p.title.match(/\[([^\]]+)\]/);
             if (bracketMatch) {
               const rawSet = bracketMatch[1];
               setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
             } else {
-              // Fallback to parentheses code
               const parenMatch = p.title.match(/\(([^)]+)\)/);
-              if (parenMatch) {
-                setCode = parenMatch[1].split('-')[0];
-              }
+              if (parenMatch) setCode = parenMatch[1].split('-')[0];
             }
           }
 
@@ -197,63 +192,59 @@ async function performSearch(queryInput) {
     let allResults = (await Promise.all(fetchPromises)).flat();
     if (requestId !== currentRequestId) return;
 
-    const seenUrls = new Set();
-    allResults = allResults.filter(item => {
-      if (seenUrls.has(item.url)) return false;
-      seenUrls.add(item.url);
-      if (showInStockOnly && !item.available) return false;
+    // Save to cache
+    lastResults = allResults;
+    lastQuery = query;
 
-      const queryClean = normalizeName(query);
-      
-      // Split the baseName by common delimiters for multi-name cards
-      // (// for split/flip, / for shorthand, - for reskins)
-      const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
-      
-      return segments.some(seg => normalizeName(seg) === queryClean);
-    });
-    
-    allResults.sort((a, b) => a.price - b.price);
+    displayResults(allResults, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId);
 
-    if (showCheapestVendor && showCheapestVersion) {
-      allResults = allResults.length > 0 ? [allResults[0]] : [];
-    } else if (showCheapestVendor) {
-      const grouped = new Map();
-      allResults.forEach(item => {
-        const key = item.standardizedTitle.toLowerCase();
-        if (!grouped.has(key)) grouped.set(key, item);
-      });
-      allResults = Array.from(grouped.values());
-    } else if (showCheapestVersion) {
-      const grouped = new Map();
-      allResults.forEach(item => {
-        const key = item.vendor.toLowerCase();
-        if (!grouped.has(key)) grouped.set(key, item);
-      });
-      allResults = Array.from(grouped.values());
-    }
-
-    if (allResults.length > 0) {
-      const tableHeaders = TABLE_COLUMNS.map(col => `<th>${col.header}</th>`).join('');
-      const tableRows = allResults.map(item => {
-        const cells = TABLE_COLUMNS.map(col => `<td>${col.render(item)}</td>`).join('');
-        return `<tr>${cells}</tr>`;
-      }).join('');
-
-      resultsDiv.innerHTML = `
-        <table>
-          <thead>
-            <tr>${tableHeaders}</tr>
-          </thead>
-          <tbody>
-            ${tableRows}
-          </tbody>
-        </table>
-      `;
-    } else {
-      resultsDiv.innerHTML = `<div style="padding: 10px; color: #888;">No matches for "<strong>${query}</strong>".</div>`;
-    }
   } catch (err) {
     resultsDiv.innerHTML = '<div style="color: red;">Search error. Check console.</div>';
+  }
+}
+
+function displayResults(results, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId) {
+  const resultsDiv = document.getElementById('results');
+  const seenUrls = new Set();
+  
+  let filtered = results.filter(item => {
+    if (seenUrls.has(item.url)) return false;
+    seenUrls.add(item.url);
+    if (showInStockOnly && !item.available) return false;
+    const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
+    return segments.some(seg => normalizeName(seg) === query);
+  });
+  
+  filtered.sort((a, b) => a.price - b.price);
+
+  if (showCheapestVendor && showCheapestVersion) {
+    filtered = filtered.length > 0 ? [filtered[0]] : [];
+  } else if (showCheapestVendor) {
+    const grouped = new Map();
+    filtered.forEach(item => {
+      const key = item.standardizedTitle.toLowerCase();
+      if (!grouped.has(key)) grouped.set(key, item);
+    });
+    filtered = Array.from(grouped.values());
+  } else if (showCheapestVersion) {
+    const grouped = new Map();
+    filtered.forEach(item => {
+      const key = item.vendor.toLowerCase();
+      if (!grouped.has(key)) grouped.set(key, item);
+    });
+    filtered = Array.from(grouped.values());
+  }
+
+  if (filtered.length > 0) {
+    const tableHeaders = TABLE_COLUMNS.map(col => `<th>${col.header}</th>`).join('');
+    const tableRows = filtered.map(item => {
+      const cells = TABLE_COLUMNS.map(col => `<td>${col.render(item)}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+
+    resultsDiv.innerHTML = `<table><thead><tr>${tableHeaders}</tr></thead><tbody>${tableRows}</tbody></table>`;
+  } else {
+    resultsDiv.innerHTML = `<div style="padding: 10px; color: #888;">No matches found for the current filters.</div>`;
   }
 }
 
@@ -274,16 +265,14 @@ async function init() {
   }
 }
 
-const DASHBOARD_URL = "https://mtgwishboard.vercel.app"; // Production URL
-
 // Setup UI listeners
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('searchBtn').addEventListener('click', () => performSearch());
+  document.getElementById('searchBtn').addEventListener('click', () => performSearch(undefined, true));
   
   document.getElementById('cardName').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      performSearch();
+      performSearch(undefined, true);
     }
   });
 
