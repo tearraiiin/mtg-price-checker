@@ -110,6 +110,29 @@
       text-decoration: none;
     }
 
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .dashboard-link {
+      font-size: 0.8em;
+      background: #f0f0f0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #444;
+      border: 1px solid var(--border-color);
+      transition: all 0.2s;
+    }
+
+    .dashboard-link:hover {
+      background: #e0e0e0;
+      color: #000;
+      text-decoration: none;
+    }
+
     a { color: var(--accent-color); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
@@ -156,7 +179,10 @@
   </style>
 </head>
 <body>
-  <h3>Price Checker</h3>
+  <div class="header-container">
+    <h3 style="margin: 0;">Merchant Scroll</h3>
+    <a href="#" id="openDashboard" class="dashboard-link">Open Wishboard</a>
+  </div>
   
   <div class="controls">
     <div class="search-box">
@@ -190,11 +216,6 @@
   </div>
 
   <div id="results"></div>
-  
-  <div id="debug" style="display: flex; margin-top: 20px; padding-top: 10px; border-top: 1px dashed #666; font-size: 0.7em; color: #888;">
-    <strong>Raw Titles (Debug):</strong>
-    <div id="rawTitles"></div>
-  </div>
 
   <script src="popup.js"></script>
 </body>

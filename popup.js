@@ -57,11 +57,9 @@ async function performSearch(queryInput) {
   const query = normalizeName(rawQuery);
 
   const resultsDiv = document.getElementById('results');
-  const rawTitlesDiv = document.getElementById('rawTitles');
 
   if (!query) {
     resultsDiv.innerHTML = '';
-    rawTitlesDiv.innerHTML = '';
     return;
   }
 
@@ -76,7 +74,6 @@ async function performSearch(queryInput) {
   const showInStockOnly = document.getElementById('toggleInStock').checked;
 
   resultsDiv.innerHTML = `<div style="color: #666;">Searching for "<strong>${rawQuery}</strong>"...</div>`;
-  rawTitlesDiv.innerHTML = '';
 
   if (Object.keys(setMap).length === 0) await loadSetMap();
   if (requestId !== currentRequestId) return;
@@ -97,14 +94,12 @@ async function performSearch(queryInput) {
   });
 
   try {
-    const allRawTitles = [];
     const fetchPromises = searchTasks.map(async ({ store, q }) => {
       try {
         const cacheBuster = `&_cb=${Date.now()}`;
         const res = await fetch(`${store.url}/search/suggest.json?q=${encodeURIComponent(q)}&resources[type]=product${cacheBuster}`);
         const data = await res.json();
         const products = data.resources?.results?.products || [];
-        products.forEach(p => allRawTitles.push(`${store.name}: ${p.title} (${p.available ? 'In' : 'Out'})`));
 
         return products.map(p => {
           let baseName = p.title;
@@ -197,10 +192,6 @@ async function performSearch(queryInput) {
       allResults = Array.from(grouped.values());
     }
 
-    rawTitlesDiv.innerHTML = allRawTitles.length > 0 
-      ? allRawTitles.map(t => `<div style="margin-bottom:2px; border-bottom:1px solid #eee;">${t}</div>`).join('')
-      : 'No products returned from Shopify.';
-
     if (allResults.length > 0) {
       const tableHeaders = TABLE_COLUMNS.map(col => `<th>${col.header}</th>`).join('');
       const tableRows = allResults.map(item => {
@@ -243,6 +234,8 @@ async function init() {
   }
 }
 
+const DASHBOARD_URL = "https://mtgwishboard.vercel.app"; // Production URL
+
 // Setup UI listeners
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchBtn').addEventListener('click', () => performSearch());
@@ -252,6 +245,11 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       performSearch();
     }
+  });
+
+  document.getElementById('openDashboard').addEventListener('click', (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: DASHBOARD_URL });
   });
 
   ['toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock'].forEach(id => {
