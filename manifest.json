@@ -11,7 +11,9 @@
     "https://store.401games.ca/*",
     "https://facetofacegames.com/*",
     "https://emmettstoystop.com/*",
-    "*://*.moxfield.com/*"
+    "*://*.moxfield.com/*",
+    "https://mtgwishboard.vercel.app/*",
+    "http://localhost:5173/*"
   ],
   "background": {
     "service_worker": "background.js"

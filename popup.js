@@ -17,6 +17,23 @@ let currentRequestId = 0;
 const REMOTE_SET_MAP_URL = "https://mtgwishboard.vercel.app/setnames.json";
 const LOCAL_SET_MAP_URL = "http://localhost:5173/setnames.json";
 
+/**
+ * Normalizes a string by:
+ * 1. Converting to lowercase
+ * 2. Treating hyphens as spaces (important for MTG names like All-seeing)
+ * 3. Stripping all non-letter/non-number characters (except spaces)
+ * 4. Collapsing multiple spaces into one
+ * 5. Trimming
+ */
+function normalizeName(str) {
+  if (!str) return "";
+  return str.toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Load set names mapping
 async function loadSetMap() {
   if (Object.keys(setMap).length > 0) return;
