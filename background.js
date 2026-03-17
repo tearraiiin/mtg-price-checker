@@ -1,17 +1,50 @@
 let setMap = {};
+const REMOTE_SET_MAP_URL = "https://mtgwishboard.vercel.app/setnames.json";
+const LOCAL_SET_MAP_URL = "http://localhost:5173/setnames.json";
 
 // Load set names mapping
 async function loadSetMap() {
   if (Object.keys(setMap).length > 0) return;
+
   try {
-    const response = await fetch(chrome.runtime.getURL('setnames.json'));
-    const rawMap = await response.json();
-    setMap = { ...rawMap };
-    for (const [name, code] of Object.entries(rawMap)) {
-      setMap[name.toLowerCase()] = code;
+    // Try to get from storage first
+    const data = await chrome.storage.local.get(['setMap', 'setMapTimestamp']);
+    const oneDay = 24 * 60 * 60 * 1000;
+    
+    if (data.setMap && data.setMapTimestamp && (Date.now() - data.setMapTimestamp < oneDay)) {
+      setMap = data.setMap;
+      return;
     }
+
+    // Try Remote Vercel
+    try {
+      const response = await fetch(REMOTE_SET_MAP_URL);
+      if (response.ok) {
+        const rawMap = await response.json();
+        setMap = { ...rawMap };
+        for (const [name, code] of Object.entries(rawMap)) {
+          setMap[name.toLowerCase()] = code;
+        }
+        await chrome.storage.local.set({ setMap: setMap, setMapTimestamp: Date.now() });
+        return;
+      }
+    } catch (e) {}
+
+    // Try Localhost (Dev fallback)
+    try {
+      const response = await fetch(LOCAL_SET_MAP_URL);
+      if (response.ok) {
+        const rawMap = await response.json();
+        setMap = { ...rawMap };
+        for (const [name, code] of Object.entries(rawMap)) {
+          setMap[name.toLowerCase()] = code;
+        }
+        return;
+      }
+    } catch (e) {}
+
   } catch (e) {
-    console.error("Failed to load setnames.json", e);
+    console.error("Critical failure in loadSetMap", e);
   }
 }
 

@@ -118,19 +118,21 @@
     }
 
     .dashboard-link {
-      font-size: 0.8em;
-      background: #f0f0f0;
-      padding: 4px 8px;
-      border-radius: 4px;
-      color: #444;
-      border: 1px solid var(--border-color);
-      transition: all 0.2s;
+      font-size: 0.85em;
+      background: none;
+      padding: 0;
+      border-radius: 0;
+      color: black;
+      border: none;
+      transition: color 0.2s;
+      text-decoration: none;
+      font-weight: 500;
     }
 
     .dashboard-link:hover {
-      background: #e0e0e0;
-      color: #000;
-      text-decoration: none;
+      background: none;
+      color: var(--accent-color);
+      text-decoration: underline;
     }
 
     a { color: var(--accent-color); text-decoration: none; }
@@ -181,7 +183,7 @@
 <body>
   <div class="header-container">
     <h3 style="margin: 0;">Merchant Scroll</h3>
-    <a href="#" id="openDashboard" class="dashboard-link">Open Wishboard</a>
+    <a href="#" id="openDashboard" class="dashboard-link">Open Wishboard &rarr;</a>
   </div>
   
   <div class="controls">
@@ -216,6 +218,10 @@
   </div>
 
   <div id="results"></div>
+
+  <div id="setWarning" style="display: none; margin-top: 15px; padding: 8px; background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; border-radius: 4px; font-size: 0.8em;">
+    <strong>Warning:</strong> Set name lookup failed. Grouping by set/vendor may be inaccurate.
+  </div>
 
   <script src="popup.js"></script>
 </body>

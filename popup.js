@@ -14,37 +14,60 @@ const TABLE_COLUMNS = [
 
 let setMap = {};
 let currentRequestId = 0;
-
-/**
- * Normalizes a string by:
- * 1. Converting to lowercase
- * 2. Treating hyphens as spaces (important for MTG names like All-seeing)
- * 3. Stripping all non-letter/non-number characters (except spaces)
- * 4. Collapsing multiple spaces into one
- * 5. Trimming
- */
-function normalizeName(str) {
-  if (!str) return "";
-  return str.toLowerCase()
-    .replace(/-/g, ' ')
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const REMOTE_SET_MAP_URL = "https://mtgwishboard.vercel.app/setnames.json";
+const LOCAL_SET_MAP_URL = "http://localhost:5173/setnames.json";
 
 // Load set names mapping
 async function loadSetMap() {
   if (Object.keys(setMap).length > 0) return;
+  
+  const warning = document.getElementById('setWarning');
+
   try {
-    const response = await fetch('setnames.json');
-    const rawMap = await response.json();
-    // Store both original and normalized keys for maximum compatibility
-    setMap = { ...rawMap };
-    for (const [name, code] of Object.entries(rawMap)) {
-      setMap[name.toLowerCase()] = code;
+    // Try to get from storage first
+    const data = await chrome.storage.local.get(['setMap', 'setMapTimestamp']);
+    const oneDay = 24 * 60 * 60 * 1000;
+    
+    if (data.setMap && data.setMapTimestamp && (Date.now() - data.setMapTimestamp < oneDay)) {
+      setMap = data.setMap;
+      return;
     }
+
+    // Try Remote Vercel
+    try {
+      const response = await fetch(REMOTE_SET_MAP_URL);
+      if (response.ok) {
+        const rawMap = await response.json();
+        setMap = { ...rawMap };
+        for (const [name, code] of Object.entries(rawMap)) {
+          setMap[name.toLowerCase()] = code;
+        }
+        await chrome.storage.local.set({ setMap: setMap, setMapTimestamp: Date.now() });
+        if (warning) warning.style.display = 'none';
+        return;
+      }
+    } catch (e) {}
+
+    // Try Localhost (Dev fallback)
+    try {
+      const response = await fetch(LOCAL_SET_MAP_URL);
+      if (response.ok) {
+        const rawMap = await response.json();
+        setMap = { ...rawMap };
+        for (const [name, code] of Object.entries(rawMap)) {
+          setMap[name.toLowerCase()] = code;
+        }
+        if (warning) warning.style.display = 'none';
+        return;
+      }
+    } catch (e) {}
+
+    // If both failed, show warning
+    if (warning) warning.style.display = 'block';
+
   } catch (e) {
-    console.error("Failed to load setnames.json", e);
+    console.error("Critical failure in loadSetMap", e);
+    if (warning) warning.style.display = 'block';
   }
 }
 
