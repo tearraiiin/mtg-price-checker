@@ -33,7 +33,7 @@ function normalizeName(str) {
   if (!str) return "";
   return str.toLowerCase()
     .replace(/-/g, ' ')
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -211,8 +211,9 @@ function displayResults(results, showCheapestVendor, showCheapestVersion, showIn
     if (seenUrls.has(item.url)) return false;
     seenUrls.add(item.url);
     if (showInStockOnly && !item.available) return false;
+    const normalizedBaseName = normalizeName(item.baseName);
     const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
-    return segments.some(seg => normalizeName(seg) === query);
+    return normalizedBaseName === query || segments.some(seg => normalizeName(seg) === query);
   });
   
   filtered.sort((a, b) => a.price - b.price);
