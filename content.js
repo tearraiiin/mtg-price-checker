@@ -1,38 +1,59 @@
 console.log("MTG Price Checker: Content script loaded for Moxfield.");
 let lastClickedCardName = "";
 
+// Helper to extract card name from Moxfield URL pattern: /cards/xxxxx-card-name
+function getNameFromMoxfieldUrl(url) {
+  if (!url) return null;
+  try {
+    const path = url.includes('http') ? new URL(url).pathname : url;
+    // Matches /cards/ followed by 5 alphanumeric characters, a dash, and then the name
+    const match = path.match(/\/cards\/[a-zA-Z0-9]{5}-([^/?#]+)/);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1].replace(/-/g, ' ')).trim();
+    }
+  } catch (e) {}
+  return null;
+}
+
 // Capture card name on right click or left click
 function captureCardName(event) {
   const target = event.target;
   
-  // Try to find the card container
+  // 1. Check for card link (Deck List / Explorer / Image Link)
+  const link = target.closest('a[href*="/cards/"]');
+  if (link) {
+    const name = getNameFromMoxfieldUrl(link.getAttribute('href'));
+    if (name) {
+      lastClickedCardName = name;
+      return;
+    }
+  }
+
+  // 2. Check for image with alt text (Visual View)
+  if (target.tagName === 'IMG' && target.alt) {
+    lastClickedCardName = target.alt.split(' // ')[0].trim();
+    return;
+  }
+
+  // 3. Try to find the card container for other views
   const cardContainer = target.closest('.deck--visual-view-card, .card-grid-item, .deck-list-card, [data-card-name]');
-  
   if (cardContainer) {
-    // 1. Check for data attribute (some sites use this)
     if (cardContainer.dataset.cardName) {
       lastClickedCardName = cardContainer.dataset.cardName.split(' // ')[0].trim();
       return;
     }
 
-    // 2. Check for image alt (Visual View)
     const img = cardContainer.querySelector('img');
     if (img && img.alt) {
       lastClickedCardName = img.alt.split(' // ')[0].trim();
       return;
     }
 
-    // 3. Check for name element (List View)
     const nameEl = cardContainer.querySelector('.deck-list-card-name, .card-name');
     if (nameEl) {
       lastClickedCardName = nameEl.innerText.split(' // ')[0].trim();
       return;
     }
-  }
-
-  // Fallback: Check if the target itself is the name element
-  if (target.classList.contains('deck-list-card-name')) {
-    lastClickedCardName = target.innerText.split(' // ')[0].trim();
   }
 }
 
@@ -45,15 +66,13 @@ const observer = new MutationObserver((mutations) => {
     mutation.addedNodes.forEach(node => {
       if (node.nodeType !== 1) return;
 
-      // Check if the node itself is the menu or contains it
       const menu = node.classList.contains('dropdown-menu') ? node : node.querySelector('.dropdown-menu');
       if (menu) {
-        // When a menu opens, ALWAYS try to refresh the card name from its contents
         const extractedName = extractCardNameFromMenu(menu);
         if (extractedName) {
           lastClickedCardName = extractedName;
+          injectPriceCheckItem(menu);
         }
-        injectPriceCheckItem(menu);
       }
     });
   }
@@ -62,28 +81,31 @@ const observer = new MutationObserver((mutations) => {
 observer.observe(document.body, { childList: true, subtree: true });
 
 function extractCardNameFromMenu(menu) {
-  const manapoolLink = menu.querySelector('a[href*="manapool.com/card/"]');
-  const ckLink = menu.querySelector('a[href*="cardkingdom.com/mtg/"]');
+  const items = Array.from(menu.querySelectorAll('.dropdown-item'));
   
-  if (manapoolLink) {
-    try {
-      const url = new URL(manapoolLink.href);
-      const pathParts = url.pathname.split('/').filter(p => p);
-      if (pathParts.length > 0) {
-        return decodeURIComponent(pathParts[pathParts.length - 1].replace(/-/g, ' '));
-      }
-    } catch (err) {}
-  } 
-  
-  if (ckLink) {
-    try {
-      const url = new URL(ckLink.href);
-      const pathParts = url.pathname.split('/').filter(p => p);
-      if (pathParts.length > 0) {
-        return decodeURIComponent(pathParts[pathParts.length - 1].replace(/-/g, ' '));
-      }
-    } catch (err) {}
+  // High-confidence marker: "Add to Collection" or "Add One" usually only appear on card menus
+  const isCardMenu = items.some(item => 
+    item.innerText.includes('Add to Collection') || 
+    item.innerText.includes('Add One') ||
+    item.innerText.includes('Switch Printing') ||
+    item.innerText.includes('Move to Sideboard')
+  );
+
+  if (!isCardMenu) return null;
+
+  // If it is a card menu, try to find the most accurate name
+  // 1. Prioritize the name captured during the click event
+  if (lastClickedCardName) {
+    return lastClickedCardName;
   }
+
+  // 2. Fallback: Check for internal Moxfield link in the menu
+  const moxfieldLink = menu.querySelector('a[href*="/cards/"]');
+  if (moxfieldLink) {
+    const name = getNameFromMoxfieldUrl(moxfieldLink.getAttribute('href'));
+    if (name) return name;
+  }
+
   return null;
 }
 
