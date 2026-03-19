@@ -128,13 +128,16 @@ async function performSearch(queryInput, forceRefresh = false) {
   const searchTasks = [];
   STORES.forEach(store => {
     if (store.name === "401 Games") {
-      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${query}` });
+      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${rawQuery}` });
     } else if (store.name === "Face to Face") {
+      // F2F's Shopify search is very sensitive to quotes. 
+      // Using the quote-stripped normalized query for the fetch itself
+      // ensures we get results for cards like Teferi's.
       searchTasks.push({ store, q: `vendor:Magic ${query}` });
     } else if (store.name === "Emmett's Toy Stop") {
-      searchTasks.push({ store, q: `product_type:"MTG Single" ${query}` });
+      searchTasks.push({ store, q: `product_type:"MTG Single" ${rawQuery}` });
     } else {
-      searchTasks.push({ store, q: `${query}` });
+      searchTasks.push({ store, q: `${rawQuery}` });
     }
   });
 
