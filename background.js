@@ -52,6 +52,7 @@ function normalizeName(str) {
   if (!str) return "";
   return str.toLowerCase()
     .replace(/-/g, ' ')
+    .replace(/'/g, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
