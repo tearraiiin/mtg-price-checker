@@ -4,10 +4,12 @@
 
 Merchant Scroll ("the Extension") and MTG Wishboard ("the Website") are committed to protecting your privacy. This policy explains how we handle your data.
 
-## 1. Data Collection
-- **No Personal Data:** We do not collect, store, or transmit any personally identifiable information (PII) such as names, emails, or IP addresses.
-- **Search Queries:** When you search for a card, the query is sent directly from your browser to the APIs of the supported retailers (e.g., 401 Games, Face to Face Games). We do not log these searches on any central server.
-- **Local Storage:** The Extension and Website use `chrome.storage` and `localStorage` to save your preferences (e.g., "In Stock Only" toggle) and your personal watchlist. This data remains on your device and is never shared with us.
+## 1. Data Collection & Processing
+- **No Personal Data:** We do not collect, store, or transmit any personally identifiable information (PII) such as names, addresses, emails, or IP addresses.
+- **User Activity:** The Extension monitors mouse clicks (specifically mousedown and contextmenu events) locally on your device to identify MTG cards you interact with on Moxfield.com. This activity is processed entirely in-memory and is never stored, logged, or transmitted.
+- **Website Content:** The Extension reads card names, image "alt" tags, and internal URL patterns from the active tab on Moxfield.com to facilitate price checking. This content is only used to populate your search queries and is not collected or shared.
+- **Search Queries:** When you search for a card, the query is sent directly from your browser to the APIs of the supported retailers. We do not log or track your search history on any central server.
+- **Local Storage:** The Extension and Website use `chrome.storage` and `localStorage` to save your preferences and personal watchlist locally on your device. This data is never shared with us.
 
 ## 2. Third-Party Services
 - **Retailer APIs:** The Extension interacts with Shopify-based retailer APIs to fetch live pricing. These third parties may have their own privacy policies regarding how they handle incoming search requests.
