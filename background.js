@@ -64,7 +64,37 @@ const STORES = [
   { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" }
 ];
 
-async function internalSearch(query) {
+async function resolveVariant(storeUrl, productUrl) {
+  try {
+    // Construct the correct absolute URL for the .js endpoint
+    let baseUrl = productUrl;
+    if (productUrl.startsWith('/')) {
+      baseUrl = storeUrl.replace(/\/$/, '') + productUrl;
+    }
+    
+    const jsUrl = baseUrl.split('?')[0] + ".js";
+    console.log("Resolving variant from:", jsUrl);
+    
+    const res = await fetch(jsUrl);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    
+    const product = await res.json();
+    
+    // Pick the first available variant, or first variant if none are available
+    const variant = product.variants.find(v => v.available) || product.variants[0];
+    
+    if (variant) {
+      console.log("Found variant ID:", variant.id, "for", baseUrl);
+      return variant.id;
+    }
+    return null;
+  } catch (e) {
+    console.error("Error resolving variant for", productUrl, e);
+    return null;
+  }
+}
+
+async function internalSearch(query, options = {}) {
   await loadSetMap();
   const normalizedQuery = normalizeName(query);
   const rawQuery = query.trim();
@@ -74,9 +104,6 @@ async function internalSearch(query) {
     if (store.name === "401 Games") {
       q = `product_type:"Magic: The Gathering Singles" ${rawQuery}`;
     } else if (store.name === "Face to Face") {
-      // F2F's Shopify search is very sensitive to quotes. 
-      // Using the quote-stripped normalized query for the fetch itself
-      // ensures we get results for cards like Teferi's.
       q = `vendor:Magic ${normalizedQuery}`;
     } else if (store.name === "Emmett's Toy Stop") {
       q = `product_type:"MTG Single" ${rawQuery}`;
@@ -137,16 +164,29 @@ async function internalSearch(query) {
     }
   });
 
-  const allResults = (await Promise.all(fetchPromises)).flat();
+  let allResults = (await Promise.all(fetchPromises)).flat();
   const seenUrls = new Set();
   
-  return allResults.filter(item => {
+  allResults = allResults.filter(item => {
     if (seenUrls.has(item.url)) return false;
     seenUrls.add(item.url);
     const normalizedBaseName = normalizeName(item.baseName);
     const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
     return normalizedBaseName === normalizedQuery || segments.some(seg => normalizeName(seg) === normalizedQuery);
   }).sort((a, b) => a.price - b.price);
+
+  // If requested, resolve variant IDs for the top matches from 401 Games
+  if (options.resolveVariantIds) {
+    const resolutionTasks = allResults.map(async (item) => {
+      if (item.vendor === "401 Games") {
+        item.variantId = await resolveVariant(STORES[0].url, item.url);
+      }
+      return item;
+    });
+    return await Promise.all(resolutionTasks);
+  }
+
+  return allResults;
 }
 
 // Handler for messages from the website (Dashboard)
@@ -166,7 +206,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     sendResponse({ success: true });
     return true;
   } else if (message.action === "performSearch") {
-    internalSearch(message.query).then(results => {
+    internalSearch(message.query, message.options).then(results => {
       sendResponse({ success: true, results });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
