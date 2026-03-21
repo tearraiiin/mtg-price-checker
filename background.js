@@ -102,11 +102,18 @@ async function internalSearch(query, options = {}) {
   // Load store settings, but allow override via options.onlyStores
   const storageData = await chrome.storage.local.get(['settings']);
   const settings = storageData.settings || {};
-  const enabledStores = {
-    "401 Games": options.onlyStores ? options.onlyStores.includes("401 Games") : (settings.store_401 ?? true),
-    "Face to Face": options.onlyStores ? options.onlyStores.includes("Face to Face") : (settings.store_f2f ?? true),
-    "Emmett's Toy Stop": options.onlyStores ? options.onlyStores.includes("Emmett's Toy Stop") : (settings.store_emmetts ?? true)
-  };
+  
+  const enabledStores = options.onlyStores 
+    ? {
+        "401 Games": options.onlyStores.includes("401 Games"),
+        "Face to Face": options.onlyStores.includes("Face to Face"),
+        "Emmett's Toy Stop": options.onlyStores.includes("Emmett's Toy Stop")
+      }
+    : {
+        "401 Games": settings.store_401 ?? true,
+        "Face to Face": settings.store_f2f ?? true,
+        "Emmett's Toy Stop": settings.store_emmetts ?? true
+      };
 
   const searchTasks = STORES
     .filter(store => enabledStores[store.name])
@@ -210,6 +217,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   } else if (message.action === "getSettings") {
     chrome.storage.local.get(['settings']).then(data => {
       sendResponse({ success: true, settings: data.settings || {} });
+    });
+    return true;
+  } else if (message.action === "saveSettings") {
+    chrome.storage.local.set({ settings: message.settings }).then(() => {
+      sendResponse({ success: true });
     });
     return true;
   } else if (message.action === "openPriceCheck") {
