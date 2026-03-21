@@ -114,9 +114,16 @@ async function performSearch(queryInput, forceRefresh = false) {
   const showCheapestVersion = document.getElementById('toggleCheapestVersion').checked;
   const showInStockOnly = document.getElementById('toggleInStock').checked;
 
+  // Retailer settings
+  const enabledStores = {
+    "401 Games": document.getElementById('store_401').checked,
+    "Face to Face": document.getElementById('store_f2f').checked,
+    "Emmett's Toy Stop": document.getElementById('store_emmetts').checked
+  };
+
   // Use cache if query is the same and we aren't forcing a refresh
   if (!forceRefresh && query === lastQuery && lastResults.length > 0) {
-    displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId);
+    displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId);
     return;
   }
 
@@ -127,19 +134,21 @@ async function performSearch(queryInput, forceRefresh = false) {
 
   const searchTasks = [];
   STORES.forEach(store => {
+    if (!enabledStores[store.name]) return;
+
     if (store.name === "401 Games") {
       searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${rawQuery}` });
     } else if (store.name === "Face to Face") {
-      // F2F's Shopify search is very sensitive to quotes. 
-      // Using the quote-stripped normalized query for the fetch itself
-      // ensures we get results for cards like Teferi's.
       searchTasks.push({ store, q: `vendor:Magic ${query}` });
     } else if (store.name === "Emmett's Toy Stop") {
       searchTasks.push({ store, q: `product_type:"MTG Single" ${rawQuery}` });
-    } else {
-      searchTasks.push({ store, q: `${rawQuery}` });
     }
   });
+
+  if (searchTasks.length === 0) {
+    resultsDiv.innerHTML = `<div style="padding: 10px; color: #888;">Please enable at least one retailer.</div>`;
+    return;
+  }
 
   try {
     const fetchPromises = searchTasks.map(async ({ store, q }) => {
@@ -200,20 +209,21 @@ async function performSearch(queryInput, forceRefresh = false) {
     lastResults = allResults;
     lastQuery = query;
 
-    displayResults(allResults, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId);
+    displayResults(allResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId);
 
   } catch (err) {
     resultsDiv.innerHTML = '<div style="color: red;">Search error. Check console.</div>';
   }
 }
 
-function displayResults(results, showCheapestVendor, showCheapestVersion, showInStockOnly, query, requestId) {
+function displayResults(results, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId) {
   const resultsDiv = document.getElementById('results');
   const seenUrls = new Set();
   
   let filtered = results.filter(item => {
     if (seenUrls.has(item.url)) return false;
     seenUrls.add(item.url);
+    if (!enabledStores[item.vendor]) return false; // Filter out results from disabled stores (relevant for cached results)
     if (showInStockOnly && !item.available) return false;
     const normalizedBaseName = normalizeName(item.baseName);
     const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
@@ -253,25 +263,34 @@ function displayResults(results, showCheapestVendor, showCheapestVersion, showIn
   }
 }
 
-// Initial initialization
-async function init() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const searchQuery = urlParams.get('search');
-  
-  if (searchQuery) {
-    const query = decodeURIComponent(searchQuery);
-    // Clear the URL IMMEDIATELY before starting the search
-    try {
-      const newUrl = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    } catch (e) {}
-    
-    performSearch(query);
+async function saveSettings() {
+  const settings = {
+    showCheapestVendor: document.getElementById('toggleCheapestVendor').checked,
+    showCheapestVersion: document.getElementById('toggleCheapestVersion').checked,
+    showInStockOnly: document.getElementById('toggleInStock').checked,
+    store_401: document.getElementById('store_401').checked,
+    store_f2f: document.getElementById('store_f2f').checked,
+    store_emmetts: document.getElementById('store_emmetts').checked
+  };
+  await chrome.storage.local.set({ settings });
+}
+
+async function loadSettings() {
+  const data = await chrome.storage.local.get(['settings']);
+  if (data.settings) {
+    document.getElementById('toggleCheapestVendor').checked = data.settings.showCheapestVendor ?? false;
+    document.getElementById('toggleCheapestVersion').checked = data.settings.showCheapestVersion ?? false;
+    document.getElementById('toggleInStock').checked = data.settings.showInStockOnly ?? true;
+    document.getElementById('store_401').checked = data.settings.store_401 ?? true;
+    document.getElementById('store_f2f').checked = data.settings.store_f2f ?? true;
+    document.getElementById('store_emmetts').checked = data.settings.store_emmetts ?? true;
   }
 }
 
 // Setup UI listeners
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadSettings();
+
   document.getElementById('searchBtn').addEventListener('click', () => performSearch(undefined, true));
   
   document.getElementById('cardName').addEventListener('keydown', (e) => {
@@ -286,8 +305,16 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.tabs.create({ url: DASHBOARD_URL });
   });
 
-  ['toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => performSearch());
+  const allToggles = [
+    'toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock',
+    'store_401', 'store_f2f', 'store_emmetts'
+  ];
+
+  allToggles.forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      saveSettings();
+      performSearch();
+    });
   });
 
   loadSetMap();

@@ -99,17 +99,30 @@ async function internalSearch(query, options = {}) {
   const normalizedQuery = normalizeName(query);
   const rawQuery = query.trim();
 
-  const searchTasks = STORES.map(store => {
-    let q = rawQuery;
-    if (store.name === "401 Games") {
-      q = `product_type:"Magic: The Gathering Singles" ${rawQuery}`;
-    } else if (store.name === "Face to Face") {
-      q = `vendor:Magic ${normalizedQuery}`;
-    } else if (store.name === "Emmett's Toy Stop") {
-      q = `product_type:"MTG Single" ${rawQuery}`;
-    }
-    return { store, q };
-  });
+  // Load store settings, but allow override via options.onlyStores
+  const storageData = await chrome.storage.local.get(['settings']);
+  const settings = storageData.settings || {};
+  const enabledStores = {
+    "401 Games": options.onlyStores ? options.onlyStores.includes("401 Games") : (settings.store_401 ?? true),
+    "Face to Face": options.onlyStores ? options.onlyStores.includes("Face to Face") : (settings.store_f2f ?? true),
+    "Emmett's Toy Stop": options.onlyStores ? options.onlyStores.includes("Emmett's Toy Stop") : (settings.store_emmetts ?? true)
+  };
+
+  const searchTasks = STORES
+    .filter(store => enabledStores[store.name])
+    .map(store => {
+      let q = rawQuery;
+      if (store.name === "401 Games") {
+        q = `product_type:"Magic: The Gathering Singles" ${rawQuery}`;
+      } else if (store.name === "Face to Face") {
+        q = `vendor:Magic ${normalizedQuery}`;
+      } else if (store.name === "Emmett's Toy Stop") {
+        q = `product_type:"MTG Single" ${rawQuery}`;
+      }
+      return { store, q };
+    });
+
+  if (searchTasks.length === 0) return [];
 
   const fetchPromises = searchTasks.map(async ({ store, q }) => {
     try {
@@ -193,6 +206,11 @@ async function internalSearch(query, options = {}) {
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
   if (message.action === "checkExtension") {
     sendResponse({ installed: true, version: chrome.runtime.getManifest().version });
+    return true;
+  } else if (message.action === "getSettings") {
+    chrome.storage.local.get(['settings']).then(data => {
+      sendResponse({ success: true, settings: data.settings || {} });
+    });
     return true;
   } else if (message.action === "openPriceCheck") {
     const cardName = message.cardName;
