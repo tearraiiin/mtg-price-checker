@@ -230,7 +230,32 @@ function displayResults(results, showCheapestVendor, showCheapestVersion, showIn
     return normalizedBaseName === query || segments.some(seg => normalizeName(seg) === query);
   });
   
-  filtered.sort((a, b) => a.price - b.price);
+  // Per-vendor in-stock filtering: if a vendor has any in-stock items, only return those
+  const resultsByVendor = {};
+  filtered.forEach(item => {
+    if (!resultsByVendor[item.vendor]) resultsByVendor[item.vendor] = [];
+    resultsByVendor[item.vendor].push(item);
+  });
+
+  filtered = [];
+  for (const vendor in resultsByVendor) {
+    const vendorResults = resultsByVendor[vendor];
+    const inStock = vendorResults.filter(r => r.available);
+    if (inStock.length > 0) {
+      filtered.push(...inStock);
+    } else {
+      filtered.push(...vendorResults);
+    }
+  }
+
+  filtered.sort((a, b) => {
+    // Prioritize in-stock items
+    if (a.available !== b.available) {
+      return a.available ? -1 : 1;
+    }
+    // Then sort by price
+    return a.price - b.price;
+  });
 
   if (showCheapestVendor && showCheapestVersion) {
     filtered = filtered.length > 0 ? [filtered[0]] : [];

@@ -193,7 +193,34 @@ async function internalSearch(query, options = {}) {
     const normalizedBaseName = normalizeName(item.baseName);
     const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
     return normalizedBaseName === normalizedQuery || segments.some(seg => normalizeName(seg) === normalizedQuery);
-  }).sort((a, b) => a.price - b.price);
+  });
+
+  // Per-vendor in-stock filtering: if a vendor has any in-stock items, only return those
+  const resultsByVendor = {};
+  allResults.forEach(item => {
+    if (!resultsByVendor[item.vendor]) resultsByVendor[item.vendor] = [];
+    resultsByVendor[item.vendor].push(item);
+  });
+
+  allResults = [];
+  for (const vendor in resultsByVendor) {
+    const vendorResults = resultsByVendor[vendor];
+    const inStock = vendorResults.filter(r => r.available);
+    if (inStock.length > 0) {
+      allResults.push(...inStock);
+    } else {
+      allResults.push(...vendorResults);
+    }
+  }
+
+  allResults.sort((a, b) => {
+    // Prioritize in-stock items (though if filtered, they should mostly be in-stock)
+    if (a.available !== b.available) {
+      return a.available ? -1 : 1;
+    }
+    // Then sort by price
+    return a.price - b.price;
+  });
 
   // If requested, resolve variant IDs for the top matches from 401 Games
   if (options.resolveVariantIds) {
