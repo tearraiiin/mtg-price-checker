@@ -254,6 +254,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   } else if (message.action === "openPriceCheck") {
     const cardName = message.cardName;
     const url = chrome.runtime.getURL(`popup.html?search=${encodeURIComponent(cardName)}`);
+    console.log("Opening price check for:", cardName, "URL:", url);
     chrome.windows.create({
       url: url,
       type: "popup",
@@ -277,6 +278,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "openPriceCheck") {
     const cardName = message.cardName;
     const url = chrome.runtime.getURL(`popup.html?search=${encodeURIComponent(cardName)}`);
+    console.log("Opening internal price check for:", cardName, "URL:", url);
     chrome.windows.create({
       url: url,
       type: "popup",

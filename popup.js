@@ -343,5 +343,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   loadSetMap();
-  init();
+  
+  // Check for search parameter in URL
+  console.log("Popup URL:", window.location.href);
+  const params = new URLSearchParams(window.location.search);
+  const searchQuery = params.get('search');
+  console.log("Extracted searchQuery:", searchQuery);
+  
+  if (searchQuery) {
+    const input = document.getElementById('cardName');
+    if (input) {
+      console.log("Setting input value to:", searchQuery);
+      input.value = searchQuery;
+    }
+    performSearch(searchQuery, true);
+  }
 });
