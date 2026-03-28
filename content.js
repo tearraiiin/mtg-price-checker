@@ -141,11 +141,26 @@ function injectPriceCheckItem(menu) {
   
   a.addEventListener('click', (e) => {
     e.preventDefault();
+    
+    // Safety check for extension context invalidation
+    if (!chrome.runtime || !chrome.runtime.id) {
+      alert("Merchant Scroll has been updated. Please refresh the page to continue using price checks.");
+      return;
+    }
+
     if (lastClickedCardName) {
-      chrome.runtime.sendMessage({
-        action: "openPriceCheck",
-        cardName: lastClickedCardName
-      });
+      try {
+        chrome.runtime.sendMessage({
+          action: "openPriceCheck",
+          cardName: lastClickedCardName
+        });
+      } catch (err) {
+        if (err.message.includes("context invalidated")) {
+          alert("Merchant Scroll has been updated. Please refresh the page to continue using price checks.");
+        } else {
+          console.error("MTG Price Checker: Error sending message", err);
+        }
+      }
     } else {
       console.error("MTG Price Checker: Could not determine card name.");
       alert("Could not determine card name. Please try right-clicking the card first.");

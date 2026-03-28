@@ -7,7 +7,8 @@ Merchant Scroll is a research tool designed to mimic the manual search behavior 
 
 ## 2. Technical Integrity & Server Load
 We respect the infrastructure of the retailers we support. 
-- **Non-Aggressive Fetching:** The tool is designed with the explicit bottom line of **not overloading retailer servers**. It performs searches only upon direct user request and does not engage in automated scraping, broad crawling, or frequent background polling of retailer APIs.
+- **Non-Aggressive Fetching:** The tool is designed with the explicit bottom line of **not overloading retailer servers**. It performs searches only upon direct user request (e.g., searching a single card or initiating a bulk decklist search). It does not engage in broad crawling or frequent automated background polling of retailer APIs.
+- **Carting Policy:** The "Add All to Cart" feature uses publicly available Shopify permalink structures. Merchant Scroll merely aggregates the necessary variant IDs locally to generate a standard cart URL for the user to review. It does not automate the checkout process or bypass any retailer security measures.
 - **Client-Side Processing:** All searches are performed locally on the user's device. There is no central server "scraping" these sites, ensuring that the traffic remains indistinguishable from standard, legitimate user browsing.
 
 ## 3. Misuse & Limitation of Liability
