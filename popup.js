@@ -1,10 +1,3 @@
-const STORES = [
-  { name: "401 Games", url: "https://store.401games.ca" },
-  { name: "Face to Face", url: "https://facetofacegames.com" },
-  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" },
-  { name: "Hobbiesville", url: "https://hobbiesville.com" }
-];
-
 const TABLE_COLUMNS = [
   { header: "Vendor", key: "vendor", render: (item) => `<div class="vendor-cell">${item.vendor}</div>` },
   { header: "Set", key: "setCode", render: (item) => `<div class="set-cell">${item.setCode}</div>` },
@@ -13,95 +6,19 @@ const TABLE_COLUMNS = [
   { header: "", key: "url", render: (item) => `<a href="${item.url}" target="_blank" class="buy-btn">Buy</a>` }
 ];
 
-let setMap = {};
 let currentRequestId = 0;
 let lastResults = [];
 let lastQuery = "";
 
-const REMOTE_SET_MAP_URL = "https://mtgwishboard.vercel.app/setnames.json";
-const LOCAL_SET_MAP_URL = "http://localhost:5173/setnames.json";
 const DASHBOARD_URL = "https://mtgwishboard.vercel.app";
-
-/**
- * Normalizes a string by:
- * 1. Converting to lowercase
- * 2. Treating hyphens as spaces (important for MTG names like All-seeing)
- * 3. Stripping all non-letter/non-number characters (except spaces)
- * 4. Collapsing multiple spaces into one
- * 5. Trimming
- */
-function normalizeName(str) {
-  if (!str) return "";
-  return str.toLowerCase()
-    .replace(/-/g, ' ')
-    .replace(/'/g, '')
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Load set names mapping
-async function loadSetMap() {
-  if (Object.keys(setMap).length > 0) return;
-  
-  const warning = document.getElementById('setWarning');
-
-  try {
-    // Try to get from storage first
-    const data = await chrome.storage.local.get(['setMap', 'setMapTimestamp']);
-    const oneDay = 24 * 60 * 60 * 1000;
-    
-    if (data.setMap && data.setMapTimestamp && (Date.now() - data.setMapTimestamp < oneDay)) {
-      setMap = data.setMap;
-      return;
-    }
-
-    // Try Remote Vercel
-    try {
-      const response = await fetch(REMOTE_SET_MAP_URL);
-      if (response.ok) {
-        const rawMap = await response.json();
-        setMap = { ...rawMap };
-        for (const [name, code] of Object.entries(rawMap)) {
-          setMap[name.toLowerCase()] = code;
-        }
-        await chrome.storage.local.set({ setMap: setMap, setMapTimestamp: Date.now() });
-        if (warning) warning.style.display = 'none';
-        return;
-      }
-    } catch (e) {}
-
-    // Try Localhost (Dev fallback)
-    try {
-      const response = await fetch(LOCAL_SET_MAP_URL);
-      if (response.ok) {
-        const rawMap = await response.json();
-        setMap = { ...rawMap };
-        for (const [name, code] of Object.entries(rawMap)) {
-          setMap[name.toLowerCase()] = code;
-        }
-        if (warning) warning.style.display = 'none';
-        return;
-      }
-    } catch (e) {}
-
-    // If both failed, show warning
-    if (warning) warning.style.display = 'block';
-
-  } catch (e) {
-    console.error("Critical failure in loadSetMap", e);
-    if (warning) warning.style.display = 'block';
-  }
-}
 
 // Reusable search function
 async function performSearch(queryInput, forceRefresh = false) {
   const input = document.getElementById('cardName');
   const rawQuery = (queryInput !== undefined ? queryInput : input.value).trim();
-  const query = normalizeName(rawQuery);
   const resultsDiv = document.getElementById('results');
 
-  if (!query) {
+  if (!rawQuery) {
     resultsDiv.innerHTML = '';
     lastResults = [];
     lastQuery = "";
@@ -124,147 +41,47 @@ async function performSearch(queryInput, forceRefresh = false) {
   };
 
   // Use cache if query is the same and we aren't forcing a refresh
-  if (!forceRefresh && query === lastQuery && lastResults.length > 0) {
-    displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId);
+  if (!forceRefresh && rawQuery.toLowerCase() === lastQuery.toLowerCase() && lastResults.length > 0) {
+    displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, requestId);
     return;
   }
 
   resultsDiv.innerHTML = `<div style="color: #666;">Searching for "<strong>${rawQuery}</strong>"...</div>`;
 
-  if (Object.keys(setMap).length === 0) await loadSetMap();
-  if (requestId !== currentRequestId) return;
-
-  const searchTasks = [];
-  STORES.forEach(store => {
-    if (!enabledStores[store.name]) return;
-
-    if (store.name === "401 Games") {
-      searchTasks.push({ store, q: `product_type:"Magic: The Gathering Singles" ${rawQuery}` });
-    } else if (store.name === "Face to Face") {
-      searchTasks.push({ store, q: `vendor:Magic ${query}` });
-    } else if (store.name === "Emmett's Toy Stop") {
-      searchTasks.push({ store, q: `product_type:"MTG Single" ${rawQuery}` });
-    } else if (store.name === "Hobbiesville") {
-      searchTasks.push({ store, q: `tag:Brands_Magicthegathering product_type:Single ${rawQuery}` });
-    }
-  });
-
-  if (searchTasks.length === 0) {
-    resultsDiv.innerHTML = `<div style="padding: 10px; color: #888;">Please enable at least one retailer.</div>`;
-    return;
-  }
-
   try {
-    const fetchPromises = searchTasks.map(async ({ store, q }) => {
-      try {
-        const cacheBuster = `&_cb=${Date.now()}`;
-        const res = await fetch(`${store.url}/search/suggest.json?q=${encodeURIComponent(q)}&resources[type]=product${cacheBuster}`);
-        const data = await res.json();
-        const products = data.resources?.results?.products || [];
+    const stores = Object.keys(enabledStores).filter(name => enabledStores[name]);
+    
+    chrome.runtime.sendMessage({ 
+      action: "performSearch", 
+      query: rawQuery, 
+      options: { onlyStores: stores } 
+    }, (response) => {
+      if (requestId !== currentRequestId) return;
 
-        return products.map(p => {
-          let baseName = p.title;
-          let setCode = "???";
-
-          if (store.name === "401 Games") {
-            const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
-            if (nameMatch) baseName = nameMatch[1].trim();
-            const rawSet = p.vendor;
-            setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-          } else if (store.name === "Face to Face") {
-            const nameMatch = p.title.match(/^([^[]+)/);
-            if (nameMatch) baseName = nameMatch[1].trim();
-            const matches = p.title.match(/\[([^\]]+)\]/g);
-            if (matches && matches.length >= 2) {
-              const rawSet = matches[matches.length - 2].substring(1, matches[matches.length - 2].length - 1);
-              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-            }
-          } else if (store.name === "Emmett's Toy Stop") {
-            const nameMatch = p.title.match(/^(.+?)(?:\s+\()/);
-            if (nameMatch) baseName = nameMatch[1].trim();
-            const bracketMatch = p.title.match(/\[([^\]]+)\]/);
-            if (bracketMatch) {
-              const rawSet = bracketMatch[1];
-              setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-            } else {
-              const parenMatch = p.title.match(/\(([^)]+)\)/);
-              if (parenMatch) setCode = parenMatch[1].split('-')[0];
-            }
-          } else if (store.name === "Hobbiesville") {
-            const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
-            if (nameMatch) baseName = nameMatch[1].trim();
-            const rawSet = p.vendor;
-            setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-          }
-
-          return {
-            fullTitle: p.title,
-            standardizedTitle: `${baseName}-${setCode}`,
-            baseName: baseName,
-            setCode: setCode,
-            price: parseFloat(p.price_max),
-            available: p.available,
-            vendor: store.name,
-            url: store.url + p.url
-          };
-        });
-      } catch (e) { return []; }
+      if (response && response.success) {
+        lastResults = response.results;
+        lastQuery = rawQuery;
+        displayResults(lastResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, requestId);
+      } else {
+        resultsDiv.innerHTML = `<div style="color: red;">Search error: ${response?.error || 'Unknown error'}</div>`;
+      }
     });
-
-    let allResults = (await Promise.all(fetchPromises)).flat();
-    if (requestId !== currentRequestId) return;
-
-    // Save to cache
-    lastResults = allResults;
-    lastQuery = query;
-
-    displayResults(allResults, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId);
-
   } catch (err) {
     resultsDiv.innerHTML = '<div style="color: red;">Search error. Check console.</div>';
   }
 }
 
-function displayResults(results, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, query, requestId) {
+function displayResults(results, showCheapestVendor, showCheapestVersion, showInStockOnly, enabledStores, requestId) {
   const resultsDiv = document.getElementById('results');
-  const seenUrls = new Set();
   
+  // Basic UI filtering (In-stock and disabled stores)
   let filtered = results.filter(item => {
-    if (seenUrls.has(item.url)) return false;
-    seenUrls.add(item.url);
-    if (!enabledStores[item.vendor]) return false; // Filter out results from disabled stores (relevant for cached results)
+    if (!enabledStores[item.vendor]) return false;
     if (showInStockOnly && !item.available) return false;
-    const normalizedBaseName = normalizeName(item.baseName);
-    const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
-    return normalizedBaseName === query || segments.some(seg => normalizeName(seg) === query);
+    return true;
   });
   
-  // Per-vendor in-stock filtering: if a vendor has any in-stock items, only return those
-  const resultsByVendor = {};
-  filtered.forEach(item => {
-    if (!resultsByVendor[item.vendor]) resultsByVendor[item.vendor] = [];
-    resultsByVendor[item.vendor].push(item);
-  });
-
-  filtered = [];
-  for (const vendor in resultsByVendor) {
-    const vendorResults = resultsByVendor[vendor];
-    const inStock = vendorResults.filter(r => r.available);
-    if (inStock.length > 0) {
-      filtered.push(...inStock);
-    } else {
-      filtered.push(...vendorResults);
-    }
-  }
-
-  filtered.sort((a, b) => {
-    // Prioritize in-stock items
-    if (a.available !== b.available) {
-      return a.available ? -1 : 1;
-    }
-    // Then sort by price
-    return a.price - b.price;
-  });
+  // Sorting is already handled by background.js (price + availability)
 
   if (showCheapestVendor && showCheapestVersion) {
     filtered = filtered.length > 0 ? [filtered[0]] : [];
@@ -307,20 +124,22 @@ async function saveSettings() {
     store_emmetts: document.getElementById('store_emmetts').checked,
     store_hobbiesville: document.getElementById('store_hobbiesville').checked
   };
-  await chrome.storage.local.set({ settings });
+  chrome.runtime.sendMessage({ action: "saveSettings", settings });
 }
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get(['settings']);
-  if (data.settings) {
-    document.getElementById('toggleCheapestVendor').checked = data.settings.showCheapestVendor ?? false;
-    document.getElementById('toggleCheapestVersion').checked = data.settings.showCheapestVersion ?? false;
-    document.getElementById('toggleInStock').checked = data.settings.showInStockOnly ?? true;
-    document.getElementById('store_401').checked = data.settings.store_401 ?? true;
-    document.getElementById('store_f2f').checked = data.settings.store_f2f ?? true;
-    document.getElementById('store_emmetts').checked = data.settings.store_emmetts ?? true;
-    document.getElementById('store_hobbiesville').checked = data.settings.store_hobbiesville ?? true;
-  }
+  chrome.runtime.sendMessage({ action: "getSettings" }, (response) => {
+    if (response && response.success && response.settings) {
+      const s = response.settings;
+      document.getElementById('toggleCheapestVendor').checked = s.showCheapestVendor ?? false;
+      document.getElementById('toggleCheapestVersion').checked = s.showCheapestVersion ?? false;
+      document.getElementById('toggleInStock').checked = s.showInStockOnly ?? true;
+      document.getElementById('store_401').checked = s.store_401 ?? true;
+      document.getElementById('store_f2f').checked = s.store_f2f ?? true;
+      document.getElementById('store_emmetts').checked = s.store_emmetts ?? true;
+      document.getElementById('store_hobbiesville').checked = s.store_hobbiesville ?? true;
+    }
+  });
 }
 
 // Setup UI listeners
@@ -352,8 +171,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       performSearch();
     });
   });
-
-  loadSetMap();
   
   // Check for search parameter in URL
   const params = new URLSearchParams(window.location.search);

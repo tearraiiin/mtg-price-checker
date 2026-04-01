@@ -282,7 +282,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 });
 
-// Handler for messages within the extension (Content Scripts)
+// Handler for messages within the extension (Popup, Content Scripts)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "openPriceCheck") {
     const cardName = message.cardName;
@@ -294,5 +294,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       width: 380,
       height: 550
     });
+    sendResponse({ success: true });
+  } else if (message.action === "performSearch") {
+    internalSearch(message.query, message.options).then(results => {
+      sendResponse({ success: true, results });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async response
+  } else if (message.action === "getSettings") {
+    chrome.storage.local.get(['settings']).then(data => {
+      sendResponse({ success: true, settings: data.settings || {} });
+    });
+    return true;
+  } else if (message.action === "saveSettings") {
+    chrome.storage.local.set({ settings: message.settings }).then(() => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
