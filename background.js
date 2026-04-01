@@ -61,7 +61,8 @@ function normalizeName(str) {
 const STORES = [
   { name: "401 Games", url: "https://store.401games.ca" },
   { name: "Face to Face", url: "https://facetofacegames.com" },
-  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" }
+  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" },
+  { name: "Hobbiesville", url: "https://hobbiesville.com" }
 ];
 
 async function resolveVariant(storeUrl, productUrl) {
@@ -107,12 +108,14 @@ async function internalSearch(query, options = {}) {
     ? {
         "401 Games": options.onlyStores.includes("401 Games"),
         "Face to Face": options.onlyStores.includes("Face to Face"),
-        "Emmett's Toy Stop": options.onlyStores.includes("Emmett's Toy Stop")
+        "Emmett's Toy Stop": options.onlyStores.includes("Emmett's Toy Stop"),
+        "Hobbiesville": options.onlyStores.includes("Hobbiesville")
       }
     : {
         "401 Games": settings.store_401 ?? true,
         "Face to Face": settings.store_f2f ?? true,
-        "Emmett's Toy Stop": settings.store_emmetts ?? true
+        "Emmett's Toy Stop": settings.store_emmetts ?? true,
+        "Hobbiesville": settings.store_hobbiesville ?? true
       };
 
   const searchTasks = STORES
@@ -125,6 +128,8 @@ async function internalSearch(query, options = {}) {
         q = `vendor:Magic ${normalizedQuery}`;
       } else if (store.name === "Emmett's Toy Stop") {
         q = `product_type:"MTG Single" ${rawQuery}`;
+      } else if (store.name === "Hobbiesville") {
+        q = `tag:Brands_Magicthegathering product_type:Single ${rawQuery}`;
       }
       return { store, q };
     });
@@ -166,6 +171,11 @@ async function internalSearch(query, options = {}) {
             const parenMatch = p.title.match(/\(([^)]+)\)/);
             if (parenMatch) setCode = parenMatch[1].split('-')[0];
           }
+        } else if (store.name === "Hobbiesville") {
+          const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
+          if (nameMatch) baseName = nameMatch[1].trim();
+          const rawSet = p.vendor;
+          setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
         }
 
         return {

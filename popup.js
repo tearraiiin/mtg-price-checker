@@ -1,7 +1,8 @@
 const STORES = [
   { name: "401 Games", url: "https://store.401games.ca" },
   { name: "Face to Face", url: "https://facetofacegames.com" },
-  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" }
+  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" },
+  { name: "Hobbiesville", url: "https://hobbiesville.com" }
 ];
 
 const TABLE_COLUMNS = [
@@ -118,7 +119,8 @@ async function performSearch(queryInput, forceRefresh = false) {
   const enabledStores = {
     "401 Games": document.getElementById('store_401').checked,
     "Face to Face": document.getElementById('store_f2f').checked,
-    "Emmett's Toy Stop": document.getElementById('store_emmetts').checked
+    "Emmett's Toy Stop": document.getElementById('store_emmetts').checked,
+    "Hobbiesville": document.getElementById('store_hobbiesville').checked
   };
 
   // Use cache if query is the same and we aren't forcing a refresh
@@ -142,6 +144,8 @@ async function performSearch(queryInput, forceRefresh = false) {
       searchTasks.push({ store, q: `vendor:Magic ${query}` });
     } else if (store.name === "Emmett's Toy Stop") {
       searchTasks.push({ store, q: `product_type:"MTG Single" ${rawQuery}` });
+    } else if (store.name === "Hobbiesville") {
+      searchTasks.push({ store, q: `tag:Brands_Magicthegathering product_type:Single ${rawQuery}` });
     }
   });
 
@@ -186,6 +190,11 @@ async function performSearch(queryInput, forceRefresh = false) {
               const parenMatch = p.title.match(/\(([^)]+)\)/);
               if (parenMatch) setCode = parenMatch[1].split('-')[0];
             }
+          } else if (store.name === "Hobbiesville") {
+            const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
+            if (nameMatch) baseName = nameMatch[1].trim();
+            const rawSet = p.vendor;
+            setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
           }
 
           return {
@@ -295,7 +304,8 @@ async function saveSettings() {
     showInStockOnly: document.getElementById('toggleInStock').checked,
     store_401: document.getElementById('store_401').checked,
     store_f2f: document.getElementById('store_f2f').checked,
-    store_emmetts: document.getElementById('store_emmetts').checked
+    store_emmetts: document.getElementById('store_emmetts').checked,
+    store_hobbiesville: document.getElementById('store_hobbiesville').checked
   };
   await chrome.storage.local.set({ settings });
 }
@@ -309,6 +319,7 @@ async function loadSettings() {
     document.getElementById('store_401').checked = data.settings.store_401 ?? true;
     document.getElementById('store_f2f').checked = data.settings.store_f2f ?? true;
     document.getElementById('store_emmetts').checked = data.settings.store_emmetts ?? true;
+    document.getElementById('store_hobbiesville').checked = data.settings.store_hobbiesville ?? true;
   }
 }
 
@@ -332,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const allToggles = [
     'toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock',
-    'store_401', 'store_f2f', 'store_emmetts'
+    'store_401', 'store_f2f', 'store_emmetts', 'store_hobbiesville'
   ];
 
   allToggles.forEach(id => {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Merchant Scroll",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Quickly check MTG card prices at major Canadian retailers. Companion to MTG Wishboard.",
   "permissions": [
     "storage"
@@ -10,6 +10,7 @@
     "https://store.401games.ca/*",
     "https://facetofacegames.com/*",
     "https://emmettstoystop.com/*",
+    "https://hobbiesville.com/*",
     "*://*.moxfield.com/*",
     "https://mtgwishboard.vercel.app/*",
     "http://localhost:5173/*"
