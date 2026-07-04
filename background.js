@@ -232,11 +232,12 @@ async function internalSearch(query, options = {}) {
     return a.price - b.price;
   });
 
-  // If requested, resolve variant IDs for the top matches from 401 Games
+  // If requested, resolve variant IDs for the top matches
   if (options.resolveVariantIds) {
     const resolutionTasks = allResults.map(async (item) => {
-      if (item.vendor === "401 Games") {
-        item.variantId = await resolveVariant(STORES[0].url, item.url);
+      const store = STORES.find(s => s.name === item.vendor);
+      if (store) {
+        item.variantId = await resolveVariant(store.url, item.url);
       }
       return item;
     });
@@ -279,6 +280,13 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       sendResponse({ success: false, error: error.message });
     });
     return true; // Keep channel open for async response
+  } else if (message.action === "resolveVariant") {
+    resolveVariant(message.storeUrl, message.productUrl).then(variantId => {
+      sendResponse({ success: true, variantId });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async response
   }
 });
 
@@ -298,6 +306,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "performSearch") {
     internalSearch(message.query, message.options).then(results => {
       sendResponse({ success: true, results });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async response
+  } else if (message.action === "resolveVariant") {
+    resolveVariant(message.storeUrl, message.productUrl).then(variantId => {
+      sendResponse({ success: true, variantId });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
