@@ -58,12 +58,102 @@ function normalizeName(str) {
     .trim();
 }
 
-const STORES = [
-  { name: "401 Games", url: "https://store.401games.ca" },
-  { name: "Face to Face", url: "https://facetofacegames.com" },
-  { name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" },
-  { name: "Hobbiesville", url: "https://hobbiesville.com" }
+const DEFAULT_VENDORS = [
+  {
+    "id": "store_401",
+    "name": "401 Games",
+    "url": "https://store.401games.ca",
+    "queryTemplate": "product_type:\"Magic: The Gathering Singles\" {rawQuery}",
+    "parser": {
+      "type": "vendor_set",
+      "nameRegex": "^(.+?)(?:\\s+[\\(-]|$)"
+    }
+  },
+  {
+    "id": "store_f2f",
+    "name": "Face to Face",
+    "url": "https://facetofacegames.com",
+    "queryTemplate": "vendor:Magic {normalizedQuery}",
+    "parser": {
+      "type": "title_brackets_ftf",
+      "nameRegex": "^([^\\[]+)",
+      "setRegex": "\\[([^\\]]+)\\]"
+    }
+  },
+  {
+    "id": "store_emmetts",
+    "name": "Emmett's Toy Stop",
+    "url": "https://emmettstoystop.com",
+    "queryTemplate": "product_type:\"MTG Single\" {rawQuery}",
+    "parser": {
+      "type": "title_brackets_or_paren",
+      "nameRegex": "^(.+?)(?:\\s+\\()",
+      "setRegex": "\\[([^\\]]+)\\]",
+      "fallbackSetRegex": "\\(([^)]+)\\)"
+    }
+  },
+  {
+    "id": "store_hobbiesville",
+    "name": "Hobbiesville",
+    "url": "https://hobbiesville.com",
+    "queryTemplate": "tag:Brands_Magicthegathering product_type:Single {rawQuery}",
+    "parser": {
+      "type": "vendor_set",
+      "nameRegex": "^(.+?)(?:\\s+[\\(-]|$)"
+    }
+  },
+  {
+    "id": "store_houseofcards",
+    "name": "House of Cards",
+    "url": "https://houseofcards.ca",
+    "queryTemplate": "product_type:\"MTG Single\" {rawQuery}",
+    "parser": {
+      "type": "title_brackets",
+      "nameRegex": "^([^\\[]+)",
+      "setRegex": "\\[([^\\]]+)\\]"
+    }
+  }
 ];
+
+let vendorsConfig = [...DEFAULT_VENDORS];
+const REMOTE_VENDORS_URL = "https://mtgwishboard.vercel.app/vendors.json";
+const LOCAL_VENDORS_URL = "http://localhost:5173/vendors.json";
+
+async function loadVendorsConfig() {
+  try {
+    const data = await chrome.storage.local.get(['vendorsConfig', 'vendorsConfigTimestamp']);
+    const oneHour = 60 * 60 * 1000;
+    
+    if (data.vendorsConfig && data.vendorsConfigTimestamp && (Date.now() - data.vendorsConfigTimestamp < oneHour)) {
+      vendorsConfig = data.vendorsConfig;
+      return;
+    }
+
+    try {
+      const response = await fetch(REMOTE_VENDORS_URL);
+      if (response.ok) {
+        vendorsConfig = await response.json();
+        await chrome.storage.local.set({ vendorsConfig: vendorsConfig, vendorsConfigTimestamp: Date.now() });
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      const response = await fetch(LOCAL_VENDORS_URL);
+      if (response.ok) {
+        vendorsConfig = await response.json();
+        await chrome.storage.local.set({ vendorsConfig: vendorsConfig, vendorsConfigTimestamp: Date.now() });
+        return;
+      }
+    } catch (e) {}
+
+    if (data.vendorsConfig) {
+      vendorsConfig = data.vendorsConfig;
+    }
+  } catch (e) {
+    console.error("Failure loading vendors config", e);
+  }
+}
 
 async function resolveVariant(storeUrl, productUrl) {
   try {
@@ -97,42 +187,43 @@ async function resolveVariant(storeUrl, productUrl) {
 
 async function internalSearch(query, options = {}) {
   await loadSetMap();
+  await loadVendorsConfig();
   const normalizedQuery = normalizeName(query);
   const rawQuery = query.trim();
 
-  // Load store settings, but allow override via options.onlyStores
+  // Load store settings
   const storageData = await chrome.storage.local.get(['settings']);
   const settings = storageData.settings || {};
-  
-  const enabledStores = options.onlyStores 
-    ? {
-        "401 Games": options.onlyStores.includes("401 Games"),
-        "Face to Face": options.onlyStores.includes("Face to Face"),
-        "Emmett's Toy Stop": options.onlyStores.includes("Emmett's Toy Stop"),
-        "Hobbiesville": options.onlyStores.includes("Hobbiesville")
-      }
-    : {
-        "401 Games": settings.store_401 ?? true,
-        "Face to Face": settings.store_f2f ?? true,
-        "Emmett's Toy Stop": settings.store_emmetts ?? true,
-        "Hobbiesville": settings.store_hobbiesville ?? true
-      };
 
-  const searchTasks = STORES
-    .filter(store => enabledStores[store.name])
-    .map(store => {
-      let q = rawQuery;
-      if (store.name === "401 Games") {
-        q = `product_type:"Magic: The Gathering Singles" ${rawQuery}`;
-      } else if (store.name === "Face to Face") {
-        q = `vendor:Magic ${normalizedQuery}`;
-      } else if (store.name === "Emmett's Toy Stop") {
-        q = `product_type:"MTG Single" ${rawQuery}`;
-      } else if (store.name === "Hobbiesville") {
-        q = `tag:Brands_Magicthegathering product_type:Single ${rawQuery}`;
+  const enabledStores = {};
+  vendorsConfig.forEach(store => {
+    if (options.onlyStores) {
+      enabledStores[store.name] = options.onlyStores.includes(store.name);
+    } else {
+      enabledStores[store.name] = settings[store.id] ?? true;
+    }
+  });
+
+  const searchTasks = [];
+  for (const store of vendorsConfig) {
+    if (enabledStores[store.name]) {
+      const origin = store.url;
+      const hasPerm = await new Promise((resolve) => {
+        chrome.permissions.contains({ origins: [origin + '/*'] }, (result) => {
+          resolve(!!result);
+        });
+      });
+
+      if (hasPerm) {
+        let q = store.queryTemplate
+          .replace("{rawQuery}", rawQuery)
+          .replace("{normalizedQuery}", normalizedQuery);
+        searchTasks.push({ store, q });
+      } else {
+        console.warn(`No permission for origin: ${origin}, skipping search.`);
       }
-      return { store, q };
-    });
+    }
+  }
 
   if (searchTasks.length === 0) return [];
 
@@ -147,35 +238,43 @@ async function internalSearch(query, options = {}) {
         let baseName = p.title;
         let setCode = "???";
 
-        if (store.name === "401 Games") {
-          const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
+        const parser = store.parser || {};
+        if (parser.type === "vendor_set") {
+          const nameRegex = new RegExp(parser.nameRegex || "^(.+?)(?:\\s+[\\(-]|$)");
+          const nameMatch = p.title.match(nameRegex);
           if (nameMatch) baseName = nameMatch[1].trim();
           const rawSet = p.vendor;
           setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
-        } else if (store.name === "Face to Face") {
-          const nameMatch = p.title.match(/^([^[]+)/);
+        } else if (parser.type === "title_brackets_ftf") {
+          const nameRegex = new RegExp(parser.nameRegex || "^([^[]+)");
+          const nameMatch = p.title.match(nameRegex);
           if (nameMatch) baseName = nameMatch[1].trim();
           const matches = p.title.match(/\[([^\]]+)\]/g);
           if (matches && matches.length >= 2) {
             const rawSet = matches[matches.length - 2].substring(1, matches[matches.length - 2].length - 1);
             setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
           }
-        } else if (store.name === "Emmett's Toy Stop") {
-          const nameMatch = p.title.match(/^(.+?)(?:\s+\()/);
+        } else if (parser.type === "title_brackets_or_paren") {
+          const nameRegex = new RegExp(parser.nameRegex || "^(.+?)(?:\\s+\\()");
+          const nameMatch = p.title.match(nameRegex);
           if (nameMatch) baseName = nameMatch[1].trim();
-          const bracketMatch = p.title.match(/\[([^\]]+)\]/);
+          const bracketMatch = p.title.match(new RegExp(parser.setRegex || "\\[([^\\]]+)\\]"));
           if (bracketMatch) {
             const rawSet = bracketMatch[1];
             setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
           } else {
-            const parenMatch = p.title.match(/\(([^)]+)\)/);
+            const parenMatch = p.title.match(new RegExp(parser.fallbackSetRegex || "\\(([^)]+)\\)"));
             if (parenMatch) setCode = parenMatch[1].split('-')[0];
           }
-        } else if (store.name === "Hobbiesville") {
-          const nameMatch = p.title.match(/^(.+?)(?:\s+[\(-]|$)/);
+        } else if (parser.type === "title_brackets") {
+          const nameRegex = new RegExp(parser.nameRegex || "^([^\\[]+)");
+          const nameMatch = p.title.match(nameRegex);
           if (nameMatch) baseName = nameMatch[1].trim();
-          const rawSet = p.vendor;
-          setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
+          const bracketMatch = p.title.match(new RegExp(parser.setRegex || "\\[([^\\]]+)\\]"));
+          if (bracketMatch) {
+            const rawSet = bracketMatch[1];
+            setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
+          }
         }
 
         return {
@@ -190,6 +289,7 @@ async function internalSearch(query, options = {}) {
         };
       });
     } catch (e) {
+      console.error(`Error querying store ${store.name}:`, e);
       return [];
     }
   });
@@ -205,7 +305,7 @@ async function internalSearch(query, options = {}) {
     return normalizedBaseName === normalizedQuery || segments.some(seg => normalizeName(seg) === normalizedQuery);
   });
 
-  // Per-vendor in-stock filtering: if a vendor has any in-stock items, only return those
+  // Per-vendor in-stock filtering
   const resultsByVendor = {};
   allResults.forEach(item => {
     if (!resultsByVendor[item.vendor]) resultsByVendor[item.vendor] = [];
@@ -224,18 +324,16 @@ async function internalSearch(query, options = {}) {
   }
 
   allResults.sort((a, b) => {
-    // Prioritize in-stock items (though if filtered, they should mostly be in-stock)
     if (a.available !== b.available) {
       return a.available ? -1 : 1;
     }
-    // Then sort by price
     return a.price - b.price;
   });
 
   // If requested, resolve variant IDs for the top matches
   if (options.resolveVariantIds) {
     const resolutionTasks = allResults.map(async (item) => {
-      const store = STORES.find(s => s.name === item.vendor);
+      const store = vendorsConfig.find(s => s.name === item.vendor);
       if (store) {
         item.variantId = await resolveVariant(store.url, item.url);
       }
@@ -279,14 +377,31 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
-    return true; // Keep channel open for async response
+    return true;
   } else if (message.action === "resolveVariant") {
     resolveVariant(message.storeUrl, message.productUrl).then(variantId => {
       sendResponse({ success: true, variantId });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
-    return true; // Keep channel open for async response
+    return true;
+  } else if (message.action === "checkPermissions") {
+    const checkPromises = message.origins.map(origin => {
+      return new Promise((resolve) => {
+        chrome.permissions.contains({ origins: [origin + '/*'] }, (result) => {
+          resolve({ origin, granted: !!result });
+        });
+      });
+    });
+    Promise.all(checkPromises).then(results => {
+      sendResponse({ success: true, results });
+    });
+    return true;
+  } else if (message.action === "getVendors") {
+    loadVendorsConfig().then(() => {
+      sendResponse({ success: true, vendors: vendorsConfig });
+    });
+    return true;
   }
 });
 
@@ -309,14 +424,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
-    return true; // Keep channel open for async response
+    return true;
   } else if (message.action === "resolveVariant") {
     resolveVariant(message.storeUrl, message.productUrl).then(variantId => {
       sendResponse({ success: true, variantId });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
-    return true; // Keep channel open for async response
+    return true;
   } else if (message.action === "getSettings") {
     chrome.storage.local.get(['settings']).then(data => {
       sendResponse({ success: true, settings: data.settings || {} });
@@ -325,6 +440,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "saveSettings") {
     chrome.storage.local.set({ settings: message.settings }).then(() => {
       sendResponse({ success: true });
+    });
+    return true;
+  } else if (message.action === "checkPermissions") {
+    const checkPromises = message.origins.map(origin => {
+      return new Promise((resolve) => {
+        chrome.permissions.contains({ origins: [origin + '/*'] }, (result) => {
+          resolve({ origin, granted: !!result });
+        });
+      });
+    });
+    Promise.all(checkPromises).then(results => {
+      sendResponse({ success: true, results });
+    });
+    return true;
+  } else if (message.action === "getVendors") {
+    loadVendorsConfig().then(() => {
+      sendResponse({ success: true, vendors: vendorsConfig });
     });
     return true;
   }

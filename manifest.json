@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Merchant Scroll",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Quickly check MTG card prices at major Canadian retailers. Companion to MTG Wishboard.",
   "permissions": [
     "storage"
@@ -14,6 +14,10 @@
     "*://*.moxfield.com/*",
     "https://mtgwishboard.vercel.app/*",
     "http://localhost:5173/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js"

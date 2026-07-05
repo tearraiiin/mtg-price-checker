@@ -6,6 +6,15 @@ const TABLE_COLUMNS = [
   { header: "", key: "url", render: (item) => `<a href="${item.url}" target="_blank" class="buy-btn">Buy</a>` }
 ];
 
+const DEFAULT_VENDORS = [
+  { id: "store_401", name: "401 Games", url: "https://store.401games.ca" },
+  { id: "store_f2f", name: "Face to Face", url: "https://facetofacegames.com" },
+  { id: "store_emmetts", name: "Emmett's Toy Stop", url: "https://emmettstoystop.com" },
+  { id: "store_hobbiesville", name: "Hobbiesville", url: "https://hobbiesville.com" },
+  { id: "store_houseofcards", name: "House of Cards", url: "https://houseofcards.ca" }
+];
+
+let vendors = [...DEFAULT_VENDORS];
 let currentRequestId = 0;
 let lastResults = [];
 let lastQuery = "";
@@ -32,13 +41,12 @@ async function performSearch(queryInput, forceRefresh = false) {
   const showCheapestVersion = document.getElementById('toggleCheapestVersion').checked;
   const showInStockOnly = document.getElementById('toggleInStock').checked;
 
-  // Retailer settings
-  const enabledStores = {
-    "401 Games": document.getElementById('store_401').checked,
-    "Face to Face": document.getElementById('store_f2f').checked,
-    "Emmett's Toy Stop": document.getElementById('store_emmetts').checked,
-    "Hobbiesville": document.getElementById('store_hobbiesville').checked
-  };
+  // Build enabledStores map dynamically
+  const enabledStores = {};
+  vendors.forEach(v => {
+    const el = document.getElementById(v.id);
+    enabledStores[v.name] = el ? el.checked : true;
+  });
 
   // Use cache if query is the same and we aren't forcing a refresh
   if (!forceRefresh && rawQuery.toLowerCase() === lastQuery.toLowerCase() && lastResults.length > 0) {
@@ -81,8 +89,6 @@ function displayResults(results, showCheapestVendor, showCheapestVersion, showIn
     return true;
   });
   
-  // Sorting is already handled by background.js (price + availability)
-
   if (showCheapestVendor && showCheapestVersion) {
     filtered = filtered.length > 0 ? [filtered[0]] : [];
   } else if (showCheapestVendor) {
@@ -118,12 +124,16 @@ async function saveSettings() {
   const settings = {
     showCheapestVendor: document.getElementById('toggleCheapestVendor').checked,
     showCheapestVersion: document.getElementById('toggleCheapestVersion').checked,
-    showInStockOnly: document.getElementById('toggleInStock').checked,
-    store_401: document.getElementById('store_401').checked,
-    store_f2f: document.getElementById('store_f2f').checked,
-    store_emmetts: document.getElementById('store_emmetts').checked,
-    store_hobbiesville: document.getElementById('store_hobbiesville').checked
+    showInStockOnly: document.getElementById('toggleInStock').checked
   };
+  
+  vendors.forEach(v => {
+    const el = document.getElementById(v.id);
+    if (el) {
+      settings[v.id] = el.checked;
+    }
+  });
+
   chrome.runtime.sendMessage({ action: "saveSettings", settings });
 }
 
@@ -134,17 +144,93 @@ async function loadSettings() {
       document.getElementById('toggleCheapestVendor').checked = s.showCheapestVendor ?? false;
       document.getElementById('toggleCheapestVersion').checked = s.showCheapestVersion ?? false;
       document.getElementById('toggleInStock').checked = s.showInStockOnly ?? true;
-      document.getElementById('store_401').checked = s.store_401 ?? true;
-      document.getElementById('store_f2f').checked = s.store_f2f ?? true;
-      document.getElementById('store_emmetts').checked = s.store_emmetts ?? true;
-      document.getElementById('store_hobbiesville').checked = s.store_hobbiesville ?? true;
+      
+      vendors.forEach(v => {
+        const el = document.getElementById(v.id);
+        if (el) {
+          el.checked = s[v.id] ?? true;
+        }
+      });
     }
+  });
+}
+
+function renderVendorCheckboxes() {
+  const listDiv = document.getElementById('vendorCheckboxesList');
+  if (!listDiv) return;
+  listDiv.innerHTML = '';
+
+  const origins = vendors.map(v => v.url);
+  chrome.runtime.sendMessage({ action: "checkPermissions", origins }, (response) => {
+    const permissionsMap = {};
+    if (response && response.success) {
+      response.results.forEach(res => {
+        permissionsMap[res.origin] = res.granted;
+      });
+    }
+
+    vendors.forEach(v => {
+      const hasPermission = permissionsMap[v.url] ?? false;
+      
+      const toggleGroup = document.createElement('div');
+      toggleGroup.className = 'toggle-group';
+      
+      const label = document.createElement('label');
+      label.setAttribute('for', v.id);
+      
+      if (hasPermission) {
+        label.innerText = v.name;
+      } else {
+        label.innerHTML = `${v.name} <span style="font-size:0.75em;color:#ff9900;font-weight:bold;">(Needs Approval)</span>`;
+      }
+
+      const switchLabel = document.createElement('label');
+      switchLabel.className = 'switch';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = v.id;
+      checkbox.checked = true;
+
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      
+      switchLabel.appendChild(checkbox);
+      switchLabel.appendChild(slider);
+      toggleGroup.appendChild(label);
+      toggleGroup.appendChild(switchLabel);
+      listDiv.appendChild(toggleGroup);
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked && !hasPermission) {
+          chrome.permissions.request({ origins: [v.url + '/*'] }, (granted) => {
+            if (granted) {
+              renderVendorCheckboxes();
+              saveSettings();
+              performSearch();
+            } else {
+              checkbox.checked = false;
+            }
+          });
+        } else {
+          saveSettings();
+          performSearch();
+        }
+      });
+    });
+
+    loadSettings();
   });
 }
 
 // Setup UI listeners
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadSettings();
+  chrome.runtime.sendMessage({ action: "getVendors" }, (response) => {
+    if (response && response.success && response.vendors) {
+      vendors = response.vendors;
+    }
+    renderVendorCheckboxes();
+  });
 
   document.getElementById('searchBtn').addEventListener('click', () => performSearch(undefined, true));
   
@@ -160,12 +246,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.tabs.create({ url: DASHBOARD_URL });
   });
 
-  const allToggles = [
-    'toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock',
-    'store_401', 'store_f2f', 'store_emmetts', 'store_hobbiesville'
-  ];
-
-  allToggles.forEach(id => {
+  const standardToggles = ['toggleCheapestVendor', 'toggleCheapestVersion', 'toggleInStock'];
+  standardToggles.forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
       saveSettings();
       performSearch();
@@ -181,6 +263,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (input) {
       input.value = searchQuery;
     }
-    performSearch(searchQuery, true);
+    setTimeout(() => performSearch(searchQuery, true), 100);
   }
 });
