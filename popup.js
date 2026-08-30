@@ -169,6 +169,33 @@ function renderVendorCheckboxes() {
       });
     }
 
+    // Check for ungranted optional permissions
+    const ungrantedVendors = vendors.filter(v => !(permissionsMap[v.url] ?? false));
+    const permissionBanner = document.getElementById('permissionBanner');
+    const permissionStoresList = document.getElementById('permissionStoresList');
+    const grantPermissionsBtn = document.getElementById('grantPermissionsBtn');
+
+    if (permissionBanner && ungrantedVendors.length > 0) {
+      permissionBanner.style.display = 'block';
+      if (permissionStoresList) {
+        permissionStoresList.textContent = ungrantedVendors.map(v => v.name).join(', ');
+      }
+      if (grantPermissionsBtn) {
+        grantPermissionsBtn.onclick = () => {
+          const reqOrigins = ungrantedVendors.map(v => v.url + '/*');
+          chrome.permissions.request({ origins: reqOrigins }, (granted) => {
+            if (granted) {
+              renderVendorCheckboxes();
+              saveSettings();
+              performSearch();
+            }
+          });
+        };
+      }
+    } else if (permissionBanner) {
+      permissionBanner.style.display = 'none';
+    }
+
     vendors.forEach(v => {
       const hasPermission = permissionsMap[v.url] ?? false;
       

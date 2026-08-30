@@ -119,18 +119,21 @@ let vendorsConfig = [...DEFAULT_VENDORS];
 const REMOTE_VENDORS_URL = "https://mtgwishboard.vercel.app/vendors.json";
 const LOCAL_VENDORS_URL = "http://localhost:5173/vendors.json";
 
-async function loadVendorsConfig() {
+async function loadVendorsConfig(force = false) {
   try {
     const data = await chrome.storage.local.get(['vendorsConfig', 'vendorsConfigTimestamp']);
-    const oneHour = 60 * 60 * 1000;
+    const fiveMinutes = 5 * 60 * 1000;
     
-    if (data.vendorsConfig && data.vendorsConfigTimestamp && (Date.now() - data.vendorsConfigTimestamp < oneHour)) {
+    if (!force && data.vendorsConfig && data.vendorsConfigTimestamp && (Date.now() - data.vendorsConfigTimestamp < fiveMinutes)) {
       vendorsConfig = data.vendorsConfig;
       return;
     }
 
+    const cb = `?_cb=${Date.now()}`;
+
+    // Try Localhost (Dev)
     try {
-      const response = await fetch(REMOTE_VENDORS_URL);
+      const response = await fetch(LOCAL_VENDORS_URL + cb);
       if (response.ok) {
         vendorsConfig = await response.json();
         await chrome.storage.local.set({ vendorsConfig: vendorsConfig, vendorsConfigTimestamp: Date.now() });
@@ -138,8 +141,9 @@ async function loadVendorsConfig() {
       }
     } catch (e) {}
 
+    // Try Remote Vercel
     try {
-      const response = await fetch(LOCAL_VENDORS_URL);
+      const response = await fetch(REMOTE_VENDORS_URL + cb);
       if (response.ok) {
         vendorsConfig = await response.json();
         await chrome.storage.local.set({ vendorsConfig: vendorsConfig, vendorsConfigTimestamp: Date.now() });
@@ -147,8 +151,10 @@ async function loadVendorsConfig() {
       }
     } catch (e) {}
 
-    if (data.vendorsConfig) {
+    if (data.vendorsConfig && data.vendorsConfig.length >= DEFAULT_VENDORS.length) {
       vendorsConfig = data.vendorsConfig;
+    } else {
+      vendorsConfig = [...DEFAULT_VENDORS];
     }
   } catch (e) {
     console.error("Failure loading vendors config", e);
@@ -411,7 +417,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     });
     return true;
   } else if (message.action === "getVendors") {
-    loadVendorsConfig().then(() => {
+    loadVendorsConfig(true).then(() => {
       sendResponse({ success: true, vendors: vendorsConfig });
     });
     return true;
@@ -468,7 +474,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   } else if (message.action === "getVendors") {
-    loadVendorsConfig().then(() => {
+    loadVendorsConfig(true).then(() => {
       sendResponse({ success: true, vendors: vendorsConfig });
     });
     return true;
