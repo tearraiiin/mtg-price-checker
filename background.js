@@ -215,9 +215,12 @@ async function internalSearch(query, options = {}) {
       });
 
       if (hasPerm) {
-        let q = store.queryTemplate
-          .replace("{rawQuery}", rawQuery)
-          .replace("{normalizedQuery}", normalizedQuery);
+        const useScryfall = settings.useScryfall !== false;
+        let q = useScryfall
+          ? store.queryTemplate
+              .replace("{rawQuery}", rawQuery)
+              .replace("{normalizedQuery}", normalizedQuery)
+          : rawQuery;
         searchTasks.push({ store, q });
       } else {
         console.warn(`No permission for origin: ${origin}, skipping search.`);
@@ -296,10 +299,20 @@ async function internalSearch(query, options = {}) {
 
   let allResults = (await Promise.all(fetchPromises)).flat();
   const seenUrls = new Set();
-  
+
+  const useScryfall = settings.useScryfall !== false;
+  const superClean = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanQuery = superClean(query);
+
   allResults = allResults.filter(item => {
     if (seenUrls.has(item.url)) return false;
     seenUrls.add(item.url);
+
+    if (!useScryfall) {
+      const cleanTitle = superClean(item.fullTitle);
+      return cleanTitle.includes(cleanQuery);
+    }
+
     const normalizedBaseName = normalizeName(item.baseName);
     const segments = item.baseName.split(/\s+\/\/\s+|\s+\/\s+|\s+-\s+/);
     return normalizedBaseName === normalizedQuery || segments.some(seg => normalizeName(seg) === normalizedQuery);
