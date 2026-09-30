@@ -186,7 +186,6 @@ function renderVendorCheckboxes() {
           chrome.permissions.request({ origins: reqOrigins }, (granted) => {
             if (granted) {
               renderVendorCheckboxes();
-              saveSettings();
               performSearch();
             }
           });

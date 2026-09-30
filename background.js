@@ -252,7 +252,11 @@ async function internalSearch(query, options = {}) {
           const nameRegex = new RegExp(parser.nameRegex || "^(.+?)(?:\\s+[\\(-]|$)");
           const nameMatch = p.title.match(nameRegex);
           if (nameMatch) baseName = nameMatch[1].trim();
-          const rawSet = p.vendor;
+          let rawSet = p.vendor || "";
+          if (rawSet.toLowerCase() === store.name.toLowerCase() && p.type && p.type.includes(" - ")) {
+            const parts = p.type.split(" - ");
+            rawSet = parts[parts.length - 1].trim();
+          }
           setCode = setMap[rawSet] || setMap[rawSet.toLowerCase()] || rawSet;
         } else if (parser.type === "title_brackets_ftf") {
           const nameRegex = new RegExp(parser.nameRegex || "^([^[]+)");
@@ -375,7 +379,10 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     });
     return true;
   } else if (message.action === "saveSettings") {
-    chrome.storage.local.set({ settings: message.settings }).then(() => {
+    chrome.storage.local.get(['settings']).then(data => {
+      const merged = { ...(data.settings || {}), ...(message.settings || {}) };
+      return chrome.storage.local.set({ settings: merged });
+    }).then(() => {
       sendResponse({ success: true });
     });
     return true;
@@ -457,7 +464,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   } else if (message.action === "saveSettings") {
-    chrome.storage.local.set({ settings: message.settings }).then(() => {
+    chrome.storage.local.get(['settings']).then(data => {
+      const merged = { ...(data.settings || {}), ...(message.settings || {}) };
+      return chrome.storage.local.set({ settings: merged });
+    }).then(() => {
       sendResponse({ success: true });
     });
     return true;
