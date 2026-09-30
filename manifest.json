@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Merchant Scroll",
   "version": "1.2.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtLXqBmHYw3H29s7ZlDyvEwTFhM7luc9fNnEw4XXKIzN8wKR5EtoatK1lXvpaXEWzJlAInkxYWGasfjOBfW+Jm7ehXrOURrTPc//wVeqHWLcbqKeBR/y7EhxhvlBw+fsg4rVYdhpkuDwxp70rPzCYfu3dcAFqXPf3kyRKdUC6Hc9vfCFOHVcETFiCdBNM4Z0W0+v+geBb0eLhS26zbFmLf1b0U1CTC8AEgyGG43bm6kuuyn7ZWCIm3ny4BFmZzi7+Nt3YnTH+MHbOlTzh+UHGhX84HWo1eQp2LR+h41OaOtubQcCyGXmz1khEgFa+07NMzNtOVrkbeRjjRfug4HK6rwIDAQAB",
   "description": "Quickly check MTG card prices at major Canadian retailers. Companion to MTG Wishboard.",
   "permissions": [
     "storage"
